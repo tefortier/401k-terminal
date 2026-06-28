@@ -1,11 +1,10 @@
-
 """
 401k Momentum Terminal — Monthly Picks Calculator + Backtest Builder
 Runs via GitHub Actions on the 1st of each month.
 
 Scoring: (6M Return x 40%) + (3M Return x 40%) - (3M Volatility x 20%)
 Vol method: daily std dev * sqrt(252) over trailing 63 trading days (matches ETFReplay)
-Cash proxy: SHY | Validated: CAGR +11.9%, Sharpe 0.79, MaxDD -17.3% (ETFReplay 2006-2026)
+Cash proxy: SHY | All-ETF universe for clean total-return data
 """
 
 import json
@@ -19,19 +18,18 @@ try:
 except ImportError:
     sys.exit("ERROR: Run: pip install yfinance numpy pandas")
 
-# ── Fund universe ─────────────────────────────────────────────────────────────
+# ── Fund universe — all ETFs for clean total-return data ──────────────────────
 FUNDS = [
-    FUNDS = [
-    {"ticker": "SPY",  "name": "S&P 500",                    "category": "U.S. Equity"},
-    {"ticker": "QQQ",  "name": "Nasdaq / U.S. Growth",       "category": "U.S. Equity"},
-    {"ticker": "IWM",  "name": "U.S. Small Cap",             "category": "U.S. Equity"},
-    {"ticker": "IJH",  "name": "U.S. Mid Cap",               "category": "U.S. Equity"},
-    {"ticker": "EFA",  "name": "Intl Developed Markets",     "category": "International Equity"},
-    {"ticker": "EEM",  "name": "Emerging Markets",           "category": "Emerging Markets"},
-    {"ticker": "TLT",  "name": "Long-Term Treasury",         "category": "Treasury"},
-    {"ticker": "HYG",  "name": "High Yield Bonds",           "category": "Corp / Credit Bonds"},
-    {"ticker": "AGG",  "name": "Total Bond Market",          "category": "Bonds"},
-    {"ticker": "SHY",  "name": "Short-Term Treasury (Cash)", "category": "Treasury / Cash"},
+    {"ticker": "SPY",  "name": "S&P 500",                     "category": "U.S. Equity"},
+    {"ticker": "QQQ",  "name": "Nasdaq / U.S. Growth",        "category": "U.S. Equity"},
+    {"ticker": "IWM",  "name": "U.S. Small Cap",              "category": "U.S. Equity"},
+    {"ticker": "IJH",  "name": "U.S. Mid Cap",                "category": "U.S. Equity"},
+    {"ticker": "EFA",  "name": "Intl Developed Markets",      "category": "International Equity"},
+    {"ticker": "EEM",  "name": "Emerging Markets",            "category": "Emerging Markets"},
+    {"ticker": "TLT",  "name": "Long-Term Treasury",          "category": "Treasury"},
+    {"ticker": "HYG",  "name": "High Yield Bonds",            "category": "Corp / Credit Bonds"},
+    {"ticker": "AGG",  "name": "Total Bond Market",           "category": "Bonds"},
+    {"ticker": "SHY",  "name": "Short-Term Treasury (Cash)",  "category": "Treasury / Cash"},
 ]
 
 CASH_TICKER  = "SHY"
