@@ -1,3 +1,4 @@
+
 """
 401k Momentum Terminal — Monthly Picks Calculator + Backtest Builder
 Runs via GitHub Actions on the 1st of each month.
@@ -62,21 +63,22 @@ BACKTEST_START       = "2005-01-01"
 BACKTEST_CHART_START = "2006-01"
 
 
-# ── Download helpers ──────────────────────────────────────────────────────────
-def download_monthly(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers (monthly)...", flush=True)
-    raw = yf.download(tickers, start=start, interval="1mo",
-                      progress=False, auto_adjust=True)
-    prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
-    return prices.ffill(limit=2)
-
-
+# ── Download helper ───────────────────────────────────────────────────────────
 def download_daily(tickers, start):
     print(f"  Downloading {len(tickers)} tickers (daily)...", flush=True)
     raw = yf.download(tickers, start=start, interval="1d",
                       progress=False, auto_adjust=True)
     prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
     return prices.ffill(limit=5)
+
+
+def daily_to_monthly(daily_prices):
+    """Resample daily prices to true month-end closes. Matches ETFReplay methodology."""
+    try:
+        monthly = daily_prices.resample('ME').last()   # pandas >= 2.2
+    except ValueError:
+        monthly = daily_prices.resample('M').last()    # pandas < 2.2
+    return monthly.ffill(limit=2)
 
 
 # ── Vol helper ────────────────────────────────────────────────────────────────
@@ -239,8 +241,8 @@ def main():
     bench_tickers = list({tk for b in BENCHMARKS.values() for tk, _ in b["components"]})
     all_tickers   = list(set(fund_tickers + bench_tickers))
 
-    monthly = download_monthly(all_tickers, BACKTEST_START)
     daily   = download_daily(all_tickers, BACKTEST_START)
+    monthly = daily_to_monthly(daily)
 
     avail = [t for t in all_tickers if t in monthly.columns]
     print(f"  {len(avail)}/{len(all_tickers)} tickers | "
