@@ -1,3 +1,4 @@
+
 """
 401k Momentum Terminal — Monthly Picks Calculator + Backtest Builder
 Runs via GitHub Actions on the 1st of each month.
@@ -63,22 +64,23 @@ BACKTEST_START       = "2005-01-01"
 BACKTEST_CHART_START = "2006-01"
 
 
-# ── Download & resample ───────────────────────────────────────────────────────
+# ── Download ──────────────────────────────────────────────────────────────────
+def download_monthly(tickers, start):
+    """Monthly adjusted-close bars direct from Yahoo (best dividend fidelity)."""
+    print(f"  Downloading {len(tickers)} tickers (monthly)...", flush=True)
+    raw = yf.download(tickers, start=start, interval="1mo",
+                      progress=False, auto_adjust=True)
+    prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
+    return prices.ffill(limit=2)
+
+
 def download_daily(tickers, start):
+    """Daily closes — used only for 63-day vol calculation."""
     print(f"  Downloading {len(tickers)} tickers (daily)...", flush=True)
     raw = yf.download(tickers, start=start, interval="1d",
                       progress=False, auto_adjust=True)
     prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
     return prices.ffill(limit=5)
-
-
-def to_month_end(daily_prices):
-    """Last trading day adjusted close of each month."""
-    try:
-        out = daily_prices.resample('ME').last()
-    except ValueError:
-        out = daily_prices.resample('M').last()
-    return out.ffill(limit=2)
 
 
 # ── Vol helper ────────────────────────────────────────────────────────────────
@@ -240,8 +242,8 @@ def main():
     bench_tickers = list({tk for b in BENCHMARKS.values() for tk, _ in b["components"]})
     all_tickers   = list(set(fund_tickers + bench_tickers))
 
-    daily   = download_daily(all_tickers, BACKTEST_START)
-    monthly = to_month_end(daily)
+    monthly = download_monthly(all_tickers, BACKTEST_START)
+    daily   = download_daily(fund_tickers, BACKTEST_START)   # vol only
 
     avail = [tk for tk in all_tickers if tk in monthly.columns]
     print(f"  {len(avail)}/{len(all_tickers)} tickers | "
