@@ -2,9 +2,9 @@
 401k Momentum Terminal — Monthly Picks Calculator + Backtest Builder
 Runs via GitHub Actions on the 1st of each month.
 
-Scoring: (6M Return x 40%) + (3M Return x 40%) - (3M Volatility x 20%)
-Vol method: daily std dev * sqrt(252) over trailing 63 trading days (matches ETFReplay)
-Cash proxy: SHY | All-ETF universe for clean total-return data
+Scoring:  (6M Return × 30%) + (3M Return × 40%) - (Volatility × 30%)
+Vol method: daily std × sqrt(252) over trailing 63 trading days (matches ETFReplay)
+Cash proxy: SHY | Top 2 funds held equal-weight | No vol targeting overlay
 """
 
 import json
@@ -18,84 +18,73 @@ try:
 except ImportError:
     sys.exit("ERROR: Run: pip install yfinance numpy pandas")
 
-# ── Fund universe — all ETFs for clean total-return data ──────────────────────
+# ── Fund universe ─────────────────────────────────────────────────────────────
 FUNDS = [
-    {"ticker": "SPY",  "name": "S&P 500",                     "category": "U.S. Equity"},
-    {"ticker": "QQQ",  "name": "Nasdaq / U.S. Growth",        "category": "U.S. Equity"},
-    {"ticker": "IWM",  "name": "U.S. Small Cap",              "category": "U.S. Equity"},
-    {"ticker": "IJH",  "name": "U.S. Mid Cap",                "category": "U.S. Equity"},
-    {"ticker": "EFA",  "name": "Intl Developed Markets",      "category": "International Equity"},
-    {"ticker": "EEM",  "name": "Emerging Markets",            "category": "Emerging Markets"},
-    {"ticker": "TLT",  "name": "Long-Term Treasury",          "category": "Treasury"},
-    {"ticker": "HYG",  "name": "High Yield Bonds",            "category": "Corp / Credit Bonds"},
-    {"ticker": "AGG",  "name": "Total Bond Market",           "category": "Bonds"},
-    {"ticker": "SHY",  "name": "Short-Term Treasury (Cash)",  "category": "Treasury / Cash"},
+    {"ticker": "SPY", "name": "S&P 500",                    "category": "U.S. Equity"},
+    {"ticker": "IWF", "name": "U.S. Large Cap Growth",      "category": "U.S. Equity"},
+    {"ticker": "IWD", "name": "U.S. Large Cap Value",       "category": "U.S. Equity"},
+    {"ticker": "IWM", "name": "U.S. Small Cap",             "category": "U.S. Equity"},
+    {"ticker": "IJH", "name": "U.S. Mid Cap",               "category": "U.S. Equity"},
+    {"ticker": "EFA", "name": "Intl Developed Markets",     "category": "International Equity"},
+    {"ticker": "EEM", "name": "Emerging Markets",           "category": "Emerging Markets"},
+    {"ticker": "TLT", "name": "Long-Term Treasury",         "category": "Treasury"},
+    {"ticker": "HYG", "name": "High Yield Bonds",           "category": "Corp / Credit Bonds"},
+    {"ticker": "AGG", "name": "Total Bond Market",          "category": "Bonds"},
+    {"ticker": "SHY", "name": "Short-Term Treasury (Cash)", "category": "Treasury / Cash"},
 ]
 
-CASH_TICKER  = "SHY"
-W_6M  = 0.40
-W_3M  = 0.40
-W_VOL = 0.20
-TOP_N = 2
+CASH_TICKER = "SHY"
+W_6M        = 0.30
+W_3M        = 0.40
+W_VOL       = 0.30
+TOP_N       = 2
 
 # ── Benchmark definitions ─────────────────────────────────────────────────────
 BENCHMARKS = {
     "allworld6040": {
-        "name": "All-World 60/40",
+        "name":        "All-World 60/40",
         "description": "IEF 40% / EFA 30% / VTI 30%, monthly rebalanced",
-        "components": [("IEF", 0.40), ("EFA", 0.30), ("VTI", 0.30)],
+        "components":  [("IEF", 0.40), ("EFA", 0.30), ("VTI", 0.30)],
     },
     "spy": {
-        "name": "S&P 500 (SPY)",
+        "name":        "S&P 500 (SPY)",
         "description": "SPDR S&P 500 ETF",
-        "components": [("SPY", 1.0)],
+        "components":  [("SPY", 1.0)],
     },
     "agg": {
-        "name": "US Bonds (AGG)",
+        "name":        "US Bonds (AGG)",
         "description": "iShares Core US Aggregate Bond ETF",
-        "components": [("AGG", 1.0)],
+        "components":  [("AGG", 1.0)],
     },
 }
 
-BACKTEST_START      = "2005-01-01"   # extra year for 6M lookback warmup
+BACKTEST_START       = "2005-01-01"
 BACKTEST_CHART_START = "2006-01"
 
 
 # ── Download helpers ──────────────────────────────────────────────────────────
 def download_monthly(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers (monthly) from {start}...", flush=True)
+    print(f"  Downloading {len(tickers)} tickers (monthly)...", flush=True)
     raw = yf.download(tickers, start=start, interval="1mo",
                       progress=False, auto_adjust=True)
-    if isinstance(raw.columns, pd.MultiIndex):
-        prices = raw["Close"]
-    else:
-        prices = raw
-    prices = prices.ffill(limit=2)
-    return prices
+    prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
+    return prices.ffill(limit=2)
 
 
 def download_daily(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers (daily) from {start}...", flush=True)
+    print(f"  Downloading {len(tickers)} tickers (daily)...", flush=True)
     raw = yf.download(tickers, start=start, interval="1d",
                       progress=False, auto_adjust=True)
-    if isinstance(raw.columns, pd.MultiIndex):
-        prices = raw["Close"]
-    else:
-        prices = raw
-    prices = prices.ffill(limit=5)
-    return prices
+    prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
+    return prices.ffill(limit=5)
 
 
+# ── Vol helper ────────────────────────────────────────────────────────────────
 def daily_vol(daily_rets, ticker, as_of_date, n=63):
-    """
-    Annualised volatility using daily returns: std(daily) * sqrt(252).
-    Uses the trailing n trading days ending on or before as_of_date.
-    Matches ETFReplay methodology.
-    """
+    """std(daily returns) × sqrt(252) over trailing n trading days. Matches ETFReplay."""
     if ticker not in daily_rets.columns:
         return 0.10
-    series = daily_rets[ticker]
-    series = series[series.index <= as_of_date].dropna().iloc[-n:]
+    series = daily_rets[ticker][daily_rets.index <= as_of_date].dropna().iloc[-n:]
     if len(series) < 20:
         return 0.10
     return float(series.std() * np.sqrt(252))
@@ -103,15 +92,13 @@ def daily_vol(daily_rets, ticker, as_of_date, n=63):
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 def backtest_stats(monthly_rets):
-    """Compute CAGR, Sharpe, MaxDD, total return from a monthly return series."""
-    r = np.array(monthly_rets)
-    cum = np.cumprod(1 + r)
-    years = len(r) / 12
-    cagr = float(cum[-1] ** (1 / years) - 1) if years > 0 else 0.0
+    r      = np.array(monthly_rets)
+    cum    = np.cumprod(1 + r)
+    years  = len(r) / 12
+    cagr   = float(cum[-1] ** (1 / years) - 1) if years > 0 else 0.0
     sharpe = float((r.mean() * 12) / (r.std() * np.sqrt(12))) if r.std() > 0 else 0.0
-    drawdowns = cum / np.maximum.accumulate(cum) - 1
-    max_dd = float(drawdowns.min())
-    total = float(cum[-1] - 1)
+    max_dd = float((cum / np.maximum.accumulate(cum) - 1).min())
+    total  = float(cum[-1] - 1)
     return dict(cagr=round(cagr, 4), sharpe=round(sharpe, 4),
                 max_dd=round(max_dd, 4), total_return=round(total, 4))
 
@@ -119,9 +106,8 @@ def backtest_stats(monthly_rets):
 # ── Model backtest ────────────────────────────────────────────────────────────
 def run_model_backtest(monthly_prices, daily_prices, fund_tickers):
     """
-    Monthly rotation backtest: score funds at month-end, hold top 2 next month.
-    Vol = daily std * sqrt(252) over trailing 63 trading days (ETFReplay method).
-    No cash filter — matches ETFReplay Cash Filter OFF setting.
+    Monthly rotation: score funds at month-end, hold top 2 equal-weight next month.
+    No cash filter — SHY competes on score like any other fund.
     """
     d_rets = daily_prices[[t for t in fund_tickers if t in daily_prices.columns]].pct_change()
     m_rets = monthly_prices[fund_tickers].pct_change()
@@ -134,8 +120,7 @@ def run_model_backtest(monthly_prices, daily_prices, fund_tickers):
         if date_str < BACKTEST_CHART_START:
             continue
 
-        # Score at end of month t-1 (information available before month t begins)
-        as_of = monthly_prices.index[t - 1]
+        as_of  = monthly_prices.index[t - 1]
         scores = {}
 
         for tk in fund_tickers:
@@ -160,11 +145,11 @@ def run_model_backtest(monthly_prices, daily_prices, fund_tickers):
             monthly_rets.append(0.0)
             continue
 
-        picks = sorted(scores, key=scores.get, reverse=True)[:TOP_N]
-        month_r = [m_rets[tk].iloc[t] for tk in picks
-                   if not pd.isna(m_rets[tk].iloc[t])]
-        port_r = float(np.mean(month_r)) if month_r else 0.0
-        cum *= (1 + port_r)
+        picks  = sorted(scores, key=scores.get, reverse=True)[:TOP_N]
+        ret    = [m_rets[tk].iloc[t] for tk in picks
+                  if not pd.isna(m_rets[tk].iloc[t])]
+        port_r = float(np.mean(ret)) if ret else 0.0
+        cum   *= (1 + port_r)
 
         dates.append(date_str)
         index_vals.append(round(cum, 2))
@@ -175,7 +160,6 @@ def run_model_backtest(monthly_prices, daily_prices, fund_tickers):
 
 # ── Benchmark backtest ────────────────────────────────────────────────────────
 def run_benchmark(monthly_prices, components, model_dates):
-    """Monthly-rebalanced benchmark, aligned to model dates."""
     date_set = set(model_dates)
     tickers  = [t for t, w in components if t in monthly_prices.columns]
     if not tickers:
@@ -185,8 +169,9 @@ def run_benchmark(monthly_prices, components, model_dates):
     total_w = sum(weights.values())
     weights = {t: w / total_w for t, w in weights.items()}
 
-    rets = monthly_prices[tickers].pct_change()
-    index_vals, cum = [], 100.0
+    rets       = monthly_prices[tickers].pct_change()
+    index_vals = []
+    cum        = 100.0
 
     for t in range(1, len(monthly_prices)):
         date_str = monthly_prices.index[t].strftime("%Y-%m")
@@ -203,11 +188,11 @@ def run_benchmark(monthly_prices, components, model_dates):
 
 # ── Current picks ─────────────────────────────────────────────────────────────
 def current_picks(monthly_prices, daily_prices):
-    """Score all funds using current data. Vol = daily std * sqrt(252)."""
-    d_rets  = daily_prices[[t for t in [f["ticker"] for f in FUNDS]
-                             if t in daily_prices.columns]].pct_change()
+    fund_tickers = [f["ticker"] for f in FUNDS]
+    d_rets       = daily_prices[[t for t in fund_tickers
+                                 if t in daily_prices.columns]].pct_change()
     results, errors = [], []
-    n = len(monthly_prices)
+    n     = len(monthly_prices)
     as_of = monthly_prices.index[-1]
 
     for fund in FUNDS:
@@ -222,20 +207,25 @@ def current_picks(monthly_prices, daily_prices):
             if any(np.isnan(x) for x in [p0, p6, p3]):
                 errors.append(tk)
                 continue
-            r6  = (p0 - p6) / p6
-            r3  = (p0 - p3) / p3
-            vol = daily_vol(d_rets, tk, as_of)
+            r6    = (p0 - p6) / p6
+            r3    = (p0 - p3) / p3
+            vol   = daily_vol(d_rets, tk, as_of)
             score = r6 * W_6M + r3 * W_3M - vol * W_VOL
-            results.append({**fund,
-                            "ret_6m": round(r6, 6), "ret_3m": round(r3, 6),
-                            "vol_3m": round(vol, 6), "score": round(score, 6),
-                            "latest_price": round(p0, 4)})
+            results.append({
+                **fund,
+                "ret_6m":       round(r6,    6),
+                "ret_3m":       round(r3,    6),
+                "vol_3m":       round(vol,   6),
+                "score":        round(score, 6),
+                "latest_price": round(p0,    4),
+            })
         except Exception:
             errors.append(tk)
 
     results.sort(key=lambda x: x["score"], reverse=True)
     for i, r in enumerate(results):
         r["rank"] = i + 1
+
     return results, errors
 
 
@@ -243,6 +233,7 @@ def current_picks(monthly_prices, daily_prices):
 def main():
     now = datetime.now()
     print(f"\n401k momentum model — {now.strftime('%Y-%m-%d %H:%M')}")
+    print(f"  6M×{W_6M:.0%} + 3M×{W_3M:.0%} - Vol×{W_VOL:.0%} | Top {TOP_N} | Cash: {CASH_TICKER}")
 
     fund_tickers  = [f["ticker"] for f in FUNDS]
     bench_tickers = list({tk for b in BENCHMARKS.values() for tk, _ in b["components"]})
@@ -252,13 +243,13 @@ def main():
     daily   = download_daily(all_tickers, BACKTEST_START)
 
     avail = [t for t in all_tickers if t in monthly.columns]
-    print(f"  Loaded {len(avail)}/{len(all_tickers)} tickers | "
+    print(f"  {len(avail)}/{len(all_tickers)} tickers | "
           f"{monthly.index[0].strftime('%Y-%m')} → {monthly.index[-1].strftime('%Y-%m')}")
 
     # ── Current picks ──────────────────────────────────────────────────────────
     print("\nComputing current picks...")
-    fund_monthly = monthly[[t for t in fund_tickers if t in monthly.columns]]
-    rankings, errors = current_picks(fund_monthly, daily)
+    fund_monthly       = monthly[[t for t in fund_tickers if t in monthly.columns]]
+    rankings, errors   = current_picks(fund_monthly, daily)
 
     cash_row   = next((r for r in rankings if r["ticker"] == CASH_TICKER), None)
     cash_score = cash_row["score"] if cash_row else 0.0
@@ -266,27 +257,28 @@ def main():
     above      = sum(1 for r in rankings if r["score"] > cash_score)
 
     for p in picks:
-        print(f"  #{p['rank']} {p['ticker']} score={p['score']:+.4f}")
+        print(f"  #{p['rank']} {p['ticker']}  score={p['score']:+.4f}  "
+              f"6M={p['ret_6m']*100:+.1f}%  3M={p['ret_3m']*100:+.1f}%  vol={p['vol_3m']*100:.1f}%")
 
     # ── Model backtest ─────────────────────────────────────────────────────────
     print("\nRunning model backtest...")
     avail_funds = [t for t in fund_tickers if t in monthly.columns]
     model_dates, model_vals, model_monthly = run_model_backtest(monthly, daily, avail_funds)
     model_stats = backtest_stats(model_monthly)
-    print(f"  {len(model_dates)} months | CAGR {model_stats['cagr']*100:.1f}% "
-          f"| Sharpe {model_stats['sharpe']:.2f} | MaxDD {model_stats['max_dd']*100:.1f}%")
+    print(f"  {len(model_dates)} months | CAGR {model_stats['cagr']*100:.1f}% | "
+          f"Sharpe {model_stats['sharpe']:.2f} | MaxDD {model_stats['max_dd']*100:.1f}%")
 
     # ── Benchmark backtests ────────────────────────────────────────────────────
     bench_out = {}
     for key, bench in BENCHMARKS.items():
-        print(f"Computing {bench['name']}...", end=" ", flush=True)
+        print(f"  Benchmark {bench['name']}...", end=" ", flush=True)
         components = [(t, w) for t, w in bench["components"] if t in monthly.columns]
         if not components:
-            print("SKIPPED (no data)")
+            print("SKIPPED")
             continue
-        vals   = run_benchmark(monthly, components, model_dates)
-        idx    = np.array([100.0] + vals)
-        b_rets = np.diff(idx) / idx[:-1]
+        vals    = run_benchmark(monthly, components, model_dates)
+        idx     = np.array([100.0] + vals)
+        b_rets  = np.diff(idx) / idx[:-1]
         b_stats = backtest_stats(b_rets)
         bench_out[key] = {
             "name":        bench["name"],
@@ -298,18 +290,20 @@ def main():
 
     # ── Assemble output ────────────────────────────────────────────────────────
     output = {
-        "updated":          now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "updated_display":  now.strftime("%B %d, %Y"),
-        "month":            now.strftime("%B %Y"),
+        "updated":         now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_display": now.strftime("%B %d, %Y"),
+        "month":           now.strftime("%B %Y"),
         "scoring": {
             "ret_6m_weight": W_6M,
             "ret_3m_weight": W_3M,
             "vol_weight":    W_VOL,
+            "top_n":         TOP_N,
             "cash_proxy":    CASH_TICKER,
         },
-        "picks": [
+        "picks":            [
             {"rank": p["rank"], "ticker": p["ticker"],
-             "name": p["name"], "category": p["category"], "score": p["score"]}
+             "name": p["name"], "category": p["category"],
+             "score": p["score"], "allocation": 1.0 / TOP_N}
             for p in picks
         ],
         "rankings":         rankings,
@@ -317,10 +311,10 @@ def main():
         "funds_above_cash": above,
         "errors":           errors,
         "backtest": {
-            "dates":        model_dates,
-            "model":        model_vals,
-            "model_stats":  model_stats,
-            "benchmarks":   bench_out,
+            "dates":       model_dates,
+            "model":       model_vals,
+            "model_stats": model_stats,
+            "benchmarks":  bench_out,
         },
     }
 
@@ -330,7 +324,7 @@ def main():
     size_kb = len(json.dumps(output)) / 1024
     print(f"\n✓ data.json written ({size_kb:.1f} KB)")
     if errors:
-        print(f"  Errors: {', '.join(errors)}")
+        print(f"  Skipped: {', '.join(errors)}")
 
 
 if __name__ == "__main__":
