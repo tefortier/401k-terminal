@@ -21,7 +21,7 @@ except ImportError:
 
 # ── Fund universe ─────────────────────────────────────────────────────────────
 FUNDS = [
-    {"ticker": "AMFFX", "name": "American Mutual Fund Growth & Income", "category": "U.S. Equity"},
+    
     {"ticker": "IWB",   "name": "iShares Russell 1000 Index Fund",      "category": "U.S. Equity"},
     {"ticker": "SHY",   "name": "iShares 1-3 Year Treasury Bond ETF",   "category": "Treasury / Cash"},
     {"ticker": "VBMFX", "name": "Vanguard Total Bond Market",           "category": "Corp / Credit Bonds"},
