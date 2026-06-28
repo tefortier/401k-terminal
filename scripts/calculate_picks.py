@@ -21,18 +21,17 @@ except ImportError:
 
 # ── Fund universe ─────────────────────────────────────────────────────────────
 FUNDS = [
-    
-    {"ticker": "IWB",   "name": "iShares Russell 1000 Index Fund",      "category": "U.S. Equity"},
-    {"ticker": "SHY",   "name": "iShares 1-3 Year Treasury Bond ETF",   "category": "Treasury / Cash"},
-    {"ticker": "VBMFX", "name": "Vanguard Total Bond Market",           "category": "Corp / Credit Bonds"},
-    {"ticker": "VEIEX", "name": "Vanguard Emerging Markets MF",         "category": "Emerging Markets"},
-    {"ticker": "VGTSX", "name": "Vanguard Total Int'l Stock Index MF",  "category": "International Equity"},
-    {"ticker": "VINIX", "name": "Vanguard Instl Index Fund (S&P 500)",  "category": "U.S. Equity"},
-    {"ticker": "VISGX", "name": "Vanguard Small Cap Growth Index Inv",  "category": "U.S. Equity"},
-   
-    {"ticker": "VSNGX", "name": "JP Morgan Mid Cap Equity Instl",       "category": "U.S. Equity"},
-    {"ticker": "VUSTX", "name": "Vanguard Long-Term Treasury",          "category": "Treasury"},
-    {"ticker": "VWEHX", "name": "Vanguard High-Yield Bond MF",          "category": "Corp / Credit Bonds"},
+    FUNDS = [
+    {"ticker": "SPY",  "name": "S&P 500",                    "category": "U.S. Equity"},
+    {"ticker": "QQQ",  "name": "Nasdaq / U.S. Growth",       "category": "U.S. Equity"},
+    {"ticker": "IWM",  "name": "U.S. Small Cap",             "category": "U.S. Equity"},
+    {"ticker": "IJH",  "name": "U.S. Mid Cap",               "category": "U.S. Equity"},
+    {"ticker": "EFA",  "name": "Intl Developed Markets",     "category": "International Equity"},
+    {"ticker": "EEM",  "name": "Emerging Markets",           "category": "Emerging Markets"},
+    {"ticker": "TLT",  "name": "Long-Term Treasury",         "category": "Treasury"},
+    {"ticker": "HYG",  "name": "High Yield Bonds",           "category": "Corp / Credit Bonds"},
+    {"ticker": "AGG",  "name": "Total Bond Market",          "category": "Bonds"},
+    {"ticker": "SHY",  "name": "Short-Term Treasury (Cash)", "category": "Treasury / Cash"},
 ]
 
 CASH_TICKER  = "SHY"
