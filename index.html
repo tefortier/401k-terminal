@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -159,9 +160,9 @@
     background: var(--green-dim);
   }
   .pick-rank   { font-size: 10px; color: var(--green); font-weight: 600; letter-spacing: 0.4px; }
-  .pick-ticker { font-size: 22px; font-weight: 700; color: var(--text); margin: 3px 0 2px; }
-  .pick-name   { font-size: 10px; color: var(--muted); }
-  .pick-alloc  { font-size: 14px; font-weight: 600; color: var(--green); margin-top: 6px; }
+  .pick-class  { font-size: 17px; font-weight: 700; color: var(--text); margin: 4px 0 3px; line-height: 1.25; }
+  .pick-ticker { font-size: 10px; color: var(--muted); }
+  .pick-alloc  { font-size: 14px; font-weight: 600; color: var(--green); margin-top: 7px; }
 
   /* ── Rankings table ── */
   .section-label {
@@ -273,33 +274,33 @@
 
       <div class="cat-label">U.S. Equity</div>
       <div class="badges">
-        <span class="badge b-us">SPY</span>
-        <span class="badge b-us">IWF</span>
-        <span class="badge b-us">IWD</span>
-        <span class="badge b-us">IWM</span>
-        <span class="badge b-us">IJH</span>
+        <span class="badge b-us">S&amp;P 500</span>
+        <span class="badge b-us">LG Cap Growth</span>
+        <span class="badge b-us">LG Cap Value</span>
+        <span class="badge b-us">Small Cap</span>
+        <span class="badge b-us">Mid Cap</span>
       </div>
 
       <div class="cat-label">International Equity</div>
       <div class="badges">
-        <span class="badge b-intl">EFA</span>
+        <span class="badge b-intl">Intl Developed</span>
       </div>
 
       <div class="cat-label">Emerging Markets</div>
       <div class="badges">
-        <span class="badge b-emrg">EEM</span>
+        <span class="badge b-emrg">Emg Markets</span>
       </div>
 
       <div class="cat-label">Fixed Income</div>
       <div class="badges">
-        <span class="badge b-corp">TLT</span>
-        <span class="badge b-corp">HYG</span>
-        <span class="badge b-corp">AGG</span>
+        <span class="badge b-corp">Long Treasury</span>
+        <span class="badge b-corp">High Yield</span>
+        <span class="badge b-corp">Total Bond</span>
       </div>
 
       <div class="cat-label">Cash Proxy</div>
       <div class="badges">
-        <span class="badge b-cash">SHY</span>
+        <span class="badge b-cash">Short Treasury</span>
       </div>
 
       <div class="formula">
@@ -432,8 +433,8 @@ function renderPicks(data) {
   document.getElementById('picksGrid').innerHTML = data.picks.map(p => `
     <div class="pick-card">
       <div class="pick-rank">#${p.rank} PICK</div>
-      <div class="pick-ticker">${p.ticker}</div>
-      <div class="pick-name">${p.name}</div>
+      <div class="pick-class">${p.name}</div>
+      <div class="pick-ticker">${p.ticker} · find equivalent in your plan</div>
       <div class="pick-alloc">50% allocation</div>
     </div>`).join('');
 }
@@ -447,7 +448,12 @@ function renderRankings(rankings) {
     const clr  = r.score >= 0 ? 'var(--green)' : 'var(--red)';
     return `<tr class="${top ? 'top-pick' : ''}">
       <td><span class="rnum ${top ? 'top':''}">${r.rank}</span></td>
-      <td><span class="badge ${BADGE[r.ticker]||'b-us'}" style="font-size:10px;padding:1px 7px">${r.ticker}</span></td>
+      <td style="min-width:130px">
+        <div style="line-height:1.35">
+          <span style="font-size:11px;font-weight:${top?'600':'400'}">${r.name}</span><br>
+          <span style="font-size:9px;color:var(--dim)">${r.ticker}</span>
+        </div>
+      </td>
       <td style="width:100%"><div class="score-wrap">
         <div class="bar-bg"><div class="bar-fg" style="width:${barW}px;background:${clr}"></div></div>
         <span class="${r.score>=0?'pos':'neg'}" style="font-weight:600">${pct(r.score)}</span>
