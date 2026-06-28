@@ -1,8 +1,10 @@
+
 """
 401k Momentum Terminal — Monthly Picks Calculator + Backtest Builder
 Runs via GitHub Actions on the 1st of each month.
 
 Scoring: (6M Return x 40%) + (3M Return x 40%) - (3M Volatility x 20%)
+Vol method: daily std dev * sqrt(252) over trailing 63 trading days (matches ETFReplay)
 Cash proxy: SHY | Validated: CAGR +11.9%, Sharpe 0.79, MaxDD -17.3% (ETFReplay 2006-2026)
 """
 
@@ -58,13 +60,13 @@ BENCHMARKS = {
     },
 }
 
-BACKTEST_START = "2005-01-01"   # extra year for 6M lookback warmup
+BACKTEST_START      = "2005-01-01"   # extra year for 6M lookback warmup
 BACKTEST_CHART_START = "2006-01"
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def download_all(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers from {start}...", flush=True)
+# ── Download helpers ──────────────────────────────────────────────────────────
+def download_monthly(tickers, start):
+    print(f"  Downloading {len(tickers)} tickers (monthly) from {start}...", flush=True)
     raw = yf.download(tickers, start=start, interval="1mo",
                       progress=False, auto_adjust=True)
     if isinstance(raw.columns, pd.MultiIndex):
@@ -75,6 +77,34 @@ def download_all(tickers, start):
     return prices
 
 
+def download_daily(tickers, start):
+    print(f"  Downloading {len(tickers)} tickers (daily) from {start}...", flush=True)
+    raw = yf.download(tickers, start=start, interval="1d",
+                      progress=False, auto_adjust=True)
+    if isinstance(raw.columns, pd.MultiIndex):
+        prices = raw["Close"]
+    else:
+        prices = raw
+    prices = prices.ffill(limit=5)
+    return prices
+
+
+def daily_vol(daily_rets, ticker, as_of_date, n=63):
+    """
+    Annualised volatility using daily returns: std(daily) * sqrt(252).
+    Uses the trailing n trading days ending on or before as_of_date.
+    Matches ETFReplay methodology.
+    """
+    if ticker not in daily_rets.columns:
+        return 0.10
+    series = daily_rets[ticker]
+    series = series[series.index <= as_of_date].dropna().iloc[-n:]
+    if len(series) < 20:
+        return 0.10
+    return float(series.std() * np.sqrt(252))
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
 def backtest_stats(monthly_rets):
     """Compute CAGR, Sharpe, MaxDD, total return from a monthly return series."""
     r = np.array(monthly_rets)
@@ -89,35 +119,40 @@ def backtest_stats(monthly_rets):
                 max_dd=round(max_dd, 4), total_return=round(total, 4))
 
 
-def run_model_backtest(prices, fund_tickers):
+# ── Model backtest ────────────────────────────────────────────────────────────
+def run_model_backtest(monthly_prices, daily_prices, fund_tickers):
     """
     Monthly rotation backtest: score funds at month-end, hold top 2 next month.
-    Returns (dates, cumulative_index, monthly_returns).
+    Vol = daily std * sqrt(252) over trailing 63 trading days (ETFReplay method).
+    No cash filter — matches ETFReplay Cash Filter OFF setting.
     """
-    rets = prices[fund_tickers].pct_change()
+    d_rets = daily_prices[[t for t in fund_tickers if t in daily_prices.columns]].pct_change()
+    m_rets = monthly_prices[fund_tickers].pct_change()
+
     dates, index_vals, monthly_rets = [], [], []
     cum = 100.0
 
-    for t in range(1, len(prices)):
-        date_str = prices.index[t].strftime("%Y-%m")
+    for t in range(1, len(monthly_prices)):
+        date_str = monthly_prices.index[t].strftime("%Y-%m")
         if date_str < BACKTEST_CHART_START:
             continue
 
-        # Score using prices known at end of month t-1
+        # Score at end of month t-1 (information available before month t begins)
+        as_of = monthly_prices.index[t - 1]
         scores = {}
+
         for tk in fund_tickers:
             try:
                 if t < 7:
                     continue
-                p0 = prices[tk].iloc[t - 1]
-                p6 = prices[tk].iloc[t - 7]
-                p3 = prices[tk].iloc[t - 4]
+                p0 = monthly_prices[tk].iloc[t - 1]
+                p6 = monthly_prices[tk].iloc[t - 7]
+                p3 = monthly_prices[tk].iloc[t - 4]
                 if any(pd.isna(x) for x in [p0, p6, p3]):
                     continue
-                r6 = (p0 - p6) / p6
-                r3 = (p0 - p3) / p3
-                vol_w = rets[tk].iloc[max(0, t-4):t-1].dropna()
-                vol = float(vol_w.std() * np.sqrt(12)) if len(vol_w) >= 2 else 0.10
+                r6  = (p0 - p6) / p6
+                r3  = (p0 - p3) / p3
+                vol = daily_vol(d_rets, tk, as_of)
                 scores[tk] = r6 * W_6M + r3 * W_3M - vol * W_VOL
             except Exception:
                 continue
@@ -128,12 +163,9 @@ def run_model_backtest(prices, fund_tickers):
             monthly_rets.append(0.0)
             continue
 
-        # Top N by score (no cash filter — matches ETFReplay Cash Filter OFF setting)
         picks = sorted(scores, key=scores.get, reverse=True)[:TOP_N]
-
-        # Return this month (month t)
-        month_r = [rets[tk].iloc[t] for tk in picks
-                   if not pd.isna(rets[tk].iloc[t])]
+        month_r = [m_rets[tk].iloc[t] for tk in picks
+                   if not pd.isna(m_rets[tk].iloc[t])]
         port_r = float(np.mean(month_r)) if month_r else 0.0
         cum *= (1 + port_r)
 
@@ -144,31 +176,25 @@ def run_model_backtest(prices, fund_tickers):
     return dates, index_vals, monthly_rets
 
 
-def run_benchmark(prices, components, model_dates):
-    """
-    Compute monthly-rebalanced benchmark cumulative return.
-    Aligned to model_dates.
-    """
+# ── Benchmark backtest ────────────────────────────────────────────────────────
+def run_benchmark(monthly_prices, components, model_dates):
+    """Monthly-rebalanced benchmark, aligned to model dates."""
     date_set = set(model_dates)
-    tickers = [t for t, w in components if t in prices.columns]
+    tickers  = [t for t, w in components if t in monthly_prices.columns]
     if not tickers:
         return []
 
-    weights = {t: w for t, w in components if t in prices.columns}
-    # Renormalise weights if any component is missing
+    weights = {t: w for t, w in components if t in monthly_prices.columns}
     total_w = sum(weights.values())
     weights = {t: w / total_w for t, w in weights.items()}
 
-    rets = prices[tickers].pct_change()
+    rets = monthly_prices[tickers].pct_change()
     index_vals, cum = [], 100.0
 
-    for t in range(1, len(prices)):
-        date_str = prices.index[t].strftime("%Y-%m")
-        if date_str < BACKTEST_CHART_START:
+    for t in range(1, len(monthly_prices)):
+        date_str = monthly_prices.index[t].strftime("%Y-%m")
+        if date_str < BACKTEST_CHART_START or date_str not in date_set:
             continue
-        if date_str not in date_set:
-            continue
-
         r = sum(rets[tk].iloc[t] * w
                 for tk, w in weights.items()
                 if not pd.isna(rets[tk].iloc[t]))
@@ -178,27 +204,30 @@ def run_benchmark(prices, components, model_dates):
     return index_vals
 
 
-# ── Current picks (today's scores) ───────────────────────────────────────────
-def current_picks(prices):
-    rets = prices.pct_change()
+# ── Current picks ─────────────────────────────────────────────────────────────
+def current_picks(monthly_prices, daily_prices):
+    """Score all funds using current data. Vol = daily std * sqrt(252)."""
+    d_rets  = daily_prices[[t for t in [f["ticker"] for f in FUNDS]
+                             if t in daily_prices.columns]].pct_change()
     results, errors = [], []
-    n = len(prices)
+    n = len(monthly_prices)
+    as_of = monthly_prices.index[-1]
 
     for fund in FUNDS:
         tk = fund["ticker"]
-        if tk not in prices.columns:
+        if tk not in monthly_prices.columns:
             errors.append(tk)
             continue
         try:
-            p0 = float(prices[tk].iloc[-1])
-            p6 = float(prices[tk].iloc[max(0, n - 7)])
-            p3 = float(prices[tk].iloc[max(0, n - 4)])
+            p0 = float(monthly_prices[tk].iloc[-1])
+            p6 = float(monthly_prices[tk].iloc[max(0, n - 7)])
+            p3 = float(monthly_prices[tk].iloc[max(0, n - 4)])
             if any(np.isnan(x) for x in [p0, p6, p3]):
                 errors.append(tk)
                 continue
             r6  = (p0 - p6) / p6
             r3  = (p0 - p3) / p3
-            vol = float(rets[tk].dropna().iloc[-3:].std() * np.sqrt(12))
+            vol = daily_vol(d_rets, tk, as_of)
             score = r6 * W_6M + r3 * W_3M - vol * W_VOL
             results.append({**fund,
                             "ret_6m": round(r6, 6), "ret_3m": round(r3, 6),
@@ -219,19 +248,20 @@ def main():
     print(f"\n401k momentum model — {now.strftime('%Y-%m-%d %H:%M')}")
 
     fund_tickers  = [f["ticker"] for f in FUNDS]
-    bench_tickers = list({tk for b in BENCHMARKS.values()
-                          for tk, _ in b["components"]})
+    bench_tickers = list({tk for b in BENCHMARKS.values() for tk, _ in b["components"]})
     all_tickers   = list(set(fund_tickers + bench_tickers))
 
-    prices = download_all(all_tickers, BACKTEST_START)
-    avail  = [t for t in all_tickers if t in prices.columns]
+    monthly = download_monthly(all_tickers, BACKTEST_START)
+    daily   = download_daily(all_tickers, BACKTEST_START)
+
+    avail = [t for t in all_tickers if t in monthly.columns]
     print(f"  Loaded {len(avail)}/{len(all_tickers)} tickers | "
-          f"{prices.index[0].strftime('%Y-%m')} → {prices.index[-1].strftime('%Y-%m')}")
+          f"{monthly.index[0].strftime('%Y-%m')} → {monthly.index[-1].strftime('%Y-%m')}")
 
     # ── Current picks ──────────────────────────────────────────────────────────
     print("\nComputing current picks...")
-    fund_prices = prices[[t for t in fund_tickers if t in prices.columns]]
-    rankings, errors = current_picks(fund_prices)
+    fund_monthly = monthly[[t for t in fund_tickers if t in monthly.columns]]
+    rankings, errors = current_picks(fund_monthly, daily)
 
     cash_row   = next((r for r in rankings if r["ticker"] == CASH_TICKER), None)
     cash_score = cash_row["score"] if cash_row else 0.0
@@ -243,8 +273,8 @@ def main():
 
     # ── Model backtest ─────────────────────────────────────────────────────────
     print("\nRunning model backtest...")
-    avail_funds = [t for t in fund_tickers if t in prices.columns]
-    model_dates, model_vals, model_monthly = run_model_backtest(prices, avail_funds)
+    avail_funds = [t for t in fund_tickers if t in monthly.columns]
+    model_dates, model_vals, model_monthly = run_model_backtest(monthly, daily, avail_funds)
     model_stats = backtest_stats(model_monthly)
     print(f"  {len(model_dates)} months | CAGR {model_stats['cagr']*100:.1f}% "
           f"| Sharpe {model_stats['sharpe']:.2f} | MaxDD {model_stats['max_dd']*100:.1f}%")
@@ -253,18 +283,14 @@ def main():
     bench_out = {}
     for key, bench in BENCHMARKS.items():
         print(f"Computing {bench['name']}...", end=" ", flush=True)
-        components = [(t, w) for t, w in bench["components"] if t in prices.columns]
+        components = [(t, w) for t, w in bench["components"] if t in monthly.columns]
         if not components:
             print("SKIPPED (no data)")
             continue
-
-        vals = run_benchmark(prices, components, model_dates)
-
-        # Monthly returns from index for stats
-        idx = np.array([100.0] + vals)
+        vals   = run_benchmark(monthly, components, model_dates)
+        idx    = np.array([100.0] + vals)
         b_rets = np.diff(idx) / idx[:-1]
         b_stats = backtest_stats(b_rets)
-
         bench_out[key] = {
             "name":        bench["name"],
             "description": bench["description"],
@@ -275,9 +301,9 @@ def main():
 
     # ── Assemble output ────────────────────────────────────────────────────────
     output = {
-        "updated":         now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "updated_display": now.strftime("%B %d, %Y"),
-        "month":           now.strftime("%B %Y"),
+        "updated":          now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_display":  now.strftime("%B %d, %Y"),
+        "month":            now.strftime("%B %Y"),
         "scoring": {
             "ret_6m_weight": W_6M,
             "ret_3m_weight": W_3M,
@@ -289,15 +315,15 @@ def main():
              "name": p["name"], "category": p["category"], "score": p["score"]}
             for p in picks
         ],
-        "rankings":        rankings,
-        "cash_score":      round(cash_score, 6),
+        "rankings":         rankings,
+        "cash_score":       round(cash_score, 6),
         "funds_above_cash": above,
-        "errors":          errors,
+        "errors":           errors,
         "backtest": {
-            "dates":       model_dates,
-            "model":       model_vals,
-            "model_stats": model_stats,
-            "benchmarks":  bench_out,
+            "dates":        model_dates,
+            "model":        model_vals,
+            "model_stats":  model_stats,
+            "benchmarks":   bench_out,
         },
     }
 
