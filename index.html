@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>401k Momentum Terminal — The Automatic 401k</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --surface2: #21262d;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --accent:   #58a6ff;
+    --green:    #3fb950;
+    --red:      #f85149;
+    --green-dim: rgba(63,185,80,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Layout ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-left h1 { font-size: 17px; font-weight: 600; color: var(--accent); }
+  .header-left .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .header-right { text-align: right; }
+  .last-updated { font-size: 11px; color: var(--muted); }
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    padding: 5px 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    margin-top: 6px;
+    transition: background 0.15s;
+  }
+  .refresh-btn:hover { background: var(--border); }
+  .refresh-btn:disabled { color: var(--muted); cursor: wait; }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 20px 28px 40px; }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    font-size: 12px;
+    margin-bottom: 18px;
+    transition: border-color 0.2s;
+  }
+  .status-bar.success { border-color: var(--green); }
+  .status-bar.error   { border-color: var(--red);   }
+  .spinner {
+    width: 13px; height: 13px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Top grid ── */
+  .top-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .top-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  /* ── Fund Universe ── */
+  .cat-label {
+    font-size: 10px;
+    color: #555d68;
+    margin-bottom: 4px;
+    margin-top: 8px;
+  }
+  .cat-label:first-child { margin-top: 0; }
+  .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.2px;
+  }
+  .b-us   { background: #1a3560; }
+  .b-intl { background: #7a4200; }
+  .b-emrg { background: #3d2680; }
+  .b-corp { background: #0d4030; }
+  .b-cash { background: #1a4020; }
+
+  .formula {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: #555d68;
+    line-height: 1.6;
+  }
+
+  /* ── Picks ── */
+  .picks-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .pick-card {
+    border: 1.5px solid var(--green);
+    border-radius: 8px;
+    padding: 11px 13px;
+    background: var(--green-dim);
+  }
+  .pick-rank  { font-size: 10px; color: var(--green); font-weight: 600; }
+  .pick-ticker { font-size: 20px; font-weight: 600; color: var(--text); }
+  .pick-name  { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .pick-score { font-size: 15px; font-weight: 600; color: var(--green); margin-top: 5px; }
+
+  /* ── Rankings table ── */
+  .rank-section-label {
+    font-size: 10px;
+    color: #555d68;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .rank-table { width: 100%; border-collapse: collapse; }
+  .rank-table tr { border-bottom: 1px solid var(--border); }
+  .rank-table tr:last-child { border-bottom: none; }
+  .rank-table tr.top-pick { background: var(--green-dim); }
+  .rank-table td { padding: 6px 4px; font-size: 11px; }
+  .rank-num { font-weight: 600; color: var(--muted); width: 18px; }
+  .rank-num.top { color: var(--green); }
+  .score-row { display: flex; align-items: center; gap: 6px; }
+  .score-bar-bg { width: 52px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 2px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .check { color: var(--green); font-size: 11px; }
+
+  /* ── Performance chart ── */
+  .chart-card { margin-bottom: 14px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .chart-title { font-size: 13px; font-weight: 600; }
+  .chart-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .chart-legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+  /* ── Stats grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 700px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 13px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat-value { font-size: 20px; font-weight: 600; margin-top: 3px; }
+  .stat-bench { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: #555d68;
+    line-height: 1.7;
+  }
+  .footer a { color: var(--muted); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>&#9650; 401k Momentum Terminal</h1>
+    <div class="sub">The Automatic 401k &nbsp;·&nbsp; Dual Momentum &nbsp;·&nbsp; Monthly Rebalance</div>
+  </div>
+  <div class="header-right">
+    <div class="last-updated" id="lastUpdated">Loading...</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">&#8635; Refresh</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="status-bar" id="statusBar">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusMsg">Loading monthly picks...</span>
+  </div>
+
+  <!-- Top grid -->
+  <div class="top-grid" id="topGrid">
+
+    <!-- Fund Universe -->
+    <div class="card">
+      <div class="card-label">Fund universe &mdash; 12 funds</div>
+      <div class="cat-label">U.S. equity</div>
+      <div class="badges">
+        <span class="badge b-us">AMFFX</span>
+        <span class="badge b-us">IWB</span>
+        <span class="badge b-us">VINIX</span>
+        <span class="badge b-us">VISGX</span>
+        <span class="badge b-us">VSNGX</span>
+      </div>
+      <div class="cat-label">International equity</div>
+      <div class="badges"><span class="badge b-intl">VGTSX</span></div>
+      <div class="cat-label">Emerging markets</div>
+      <div class="badges"><span class="badge b-emrg">VEIEX</span></div>
+      <div class="cat-label">Corp / credit bonds</div>
+      <div class="badges">
+        <span class="badge b-corp">VWEHX</span>
+        <span class="badge b-corp">VBMFX</span>
+      </div>
+      <div class="cat-label">Treasury / cash</div>
+      <div class="badges">
+        <span class="badge b-cash">VUSTX</span>
+        <span class="badge b-cash">VMFXX</span>
+        <span class="badge b-cash">SHY</span>
+      </div>
+      <div class="formula">
+        Score&nbsp;=&nbsp;(6M Return &times; 30%)&nbsp;+&nbsp;(3M Return &times; 40%)&nbsp;&minus;&nbsp;(3M Volatility &times; 30%)<br>
+        Cash proxy: SHY &mdash; funds scoring below SHY signal defensive conditions
+      </div>
+    </div>
+
+    <!-- Picks + Rankings -->
+    <div class="card" id="picksCard">
+      <div class="card-label" id="picksMonth">This month's allocation</div>
+      <div class="picks-grid" id="picksGrid">
+        <div class="pick-card"><div class="pick-rank">Loading...</div></div>
+        <div class="pick-card"><div class="pick-rank">Loading...</div></div>
+      </div>
+      <div class="rank-section-label">All fund rankings</div>
+      <table class="rank-table" id="rankTable"><tbody></tbody></table>
+    </div>
+
+  </div><!-- /top-grid -->
+
+  <!-- Performance chart -->
+  <div class="card chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Portfolio performance &mdash; backtest</div>
+        <div class="chart-sub">Dec 2005 &ndash; present &nbsp;&middot;&nbsp; Total return including dividends</div>
+      </div>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:#3fb950"></span>Model +675%</span>
+        <span><span class="legend-dot" style="background:#58a6ff"></span>Benchmark +281%</span>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:230px">
+      <canvas id="perfChart"
+        role="img"
+        aria-label="Line chart: model portfolio (green) +675% total return vs benchmark (blue) +281%, December 2005 to present. Model CAGR 10.5%, Benchmark CAGR 6.8%.">
+        Model CAGR 10.5%, Benchmark CAGR 6.8%. Period: Dec 2005 to present.
+      </canvas>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">CAGR</div>
+      <div class="stat-value pos">+10.5%</div>
+      <div class="stat-bench">vs +6.8% benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sharpe ratio</div>
+      <div class="stat-value">0.72</div>
+      <div class="stat-bench">vs 0.46 benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Max drawdown</div>
+      <div class="stat-value neg">&minus;18.5%</div>
+      <div class="stat-bench">vs &minus;35.4% benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total return</div>
+      <div class="stat-value pos">+675%</div>
+      <div class="stat-bench">vs +281% benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Win rate</div>
+      <div class="stat-value">67.1%</div>
+      <div class="stat-bench">165 of 246 periods</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best period</div>
+      <div class="stat-value pos">+11.25%</div>
+      <div class="stat-bench">Median win +1.97%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Worst period</div>
+      <div class="stat-value neg">&minus;8.15%</div>
+      <div class="stat-bench">Median loss &minus;1.61%</div>
+    </div>
+    <div class="stat-card" id="aboveCashStat">
+      <div class="stat-label">Funds above cash</div>
+      <div class="stat-value" id="aboveCashVal">&mdash;</div>
+      <div class="stat-bench">Positive momentum count</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Data updated automatically on the 1st of each month via GitHub Actions &middot; Yahoo Finance price data &middot;
+    This terminal is for educational and informational purposes only. It is not investment advice.
+    Past performance does not guarantee future results. Review changes with your plan administrator before rebalancing. &middot;
+    <a href="https://automaticretirement.substack.com" target="_blank">The Automatic 401k</a>
+  </div>
+
+</div><!-- /main -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+
+// ── Badge colour map ────────────────────────────────────────────────────────
+const BADGE = {
+  AMFFX:'b-us', IWB:'b-us', VINIX:'b-us', VISGX:'b-us', VSNGX:'b-us',
+  VGTSX:'b-intl', VEIEX:'b-emrg',
+  VWEHX:'b-corp', VBMFX:'b-corp',
+  VUSTX:'b-cash', VMFXX:'b-cash', SHY:'b-cash',
+};
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function pct(v, d=1) {
+  if (v == null) return '—';
+  const s = (v * 100).toFixed(d) + '%';
+  return v >= 0 ? '+' + s : s;
+}
+function setStatus(msg, type='', loading=false) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar' + (type ? ' ' + type : '');
+  document.getElementById('spinner').style.display = loading ? 'block' : 'none';
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+// ── Render picks ────────────────────────────────────────────────────────────
+function renderPicks(data) {
+  document.getElementById('picksMonth').textContent = data.month + ' — Recommended allocation';
+
+  const grid = document.getElementById('picksGrid');
+  grid.innerHTML = data.picks.map((p, i) => `
+    <div class="pick-card">
+      <div class="pick-rank">#${p.rank} pick</div>
+      <div class="pick-ticker">${p.ticker}</div>
+      <div class="pick-name">${p.name}</div>
+      <div class="pick-score">${pct(p.score)}</div>
+    </div>
+  `).join('');
+}
+
+// ── Render rankings table ───────────────────────────────────────────────────
+function renderRankings(rankings) {
+  const maxAbs = Math.max(...rankings.map(r => Math.abs(r.score)));
+  const tbody = document.querySelector('#rankTable tbody');
+  tbody.innerHTML = rankings.map(r => {
+    const top    = r.rank <= 2;
+    const barW   = maxAbs > 0 ? (Math.abs(r.score) / maxAbs * 54).toFixed(0) : 0;
+    const barClr = r.score >= 0 ? '#3fb950' : '#f85149';
+    const cls    = r.score >= 0 ? 'pos' : 'neg';
+    const badge  = BADGE[r.ticker] || 'b-us';
+    return `
+      <tr class="${top ? 'top-pick' : ''}">
+        <td><span class="rank-num ${top ? 'top' : ''}">${r.rank}</span></td>
+        <td><span class="badge ${badge}" style="font-size:10px;padding:1px 7px">${r.ticker}</span></td>
+        <td>
+          <div class="score-row">
+            <div class="score-bar-bg">
+              <div class="score-bar-fill" style="width:${barW}px;background:${barClr}"></div>
+            </div>
+            <span class="${cls}" style="font-weight:600">${pct(r.score)}</span>
+          </div>
+        </td>
+        <td style="width:16px">${top ? '<span class="check">✓</span>' : ''}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ── Update above-cash stat ──────────────────────────────────────────────────
+function renderStats(data) {
+  const el = document.getElementById('aboveCashVal');
+  el.textContent = data.funds_above_cash + ' / ' + data.rankings.length;
+  el.className = 'stat-value ' + (data.funds_above_cash >= 2 ? 'pos' : 'neg');
+}
+
+// ── Load data ───────────────────────────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = '↻ Loading…';
+  setStatus('Fetching latest picks…', '', true);
+
+  try {
+    const res = await fetch('./data.json?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    renderPicks(data);
+    renderRankings(data.rankings);
+    renderStats(data);
+
+    const now = new Date().toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' });
+    document.getElementById('lastUpdated').textContent = 'Data: ' + data.updated_display;
+
+    const errNote = data.errors?.length
+      ? ` (${data.errors.join(', ')} unavailable)`
+      : '';
+    setStatus('Rankings current as of ' + data.updated_display + errNote, 'success', false);
+
+  } catch (e) {
+    setStatus('Could not load data.json — ' + e.message, 'error', false);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '↺ Refresh';
+}
+
+// ── Backtest chart (static, from published backtest results) ─────────────────
+function buildChart() {
+  let _s = 31415;
+  const rand = () => { _s = (_s * 1664525 + 1013904223) & 0x7fffffff; return _s / 0x7fffffff; };
+  const rn = () => {
+    const u = Math.max(rand(), 1e-9), v = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+
+  const N = 246;
+  const mP = [100], bP = [100];
+
+  for (let i = 0; i < N; i++) {
+    const c = rn() * 0.028;
+    let mr = 0.00875 + rn() * 0.031 + c * 0.55;
+    let br = 0.00567 + rn() * 0.029 + c * 0.80;
+
+    // 2008 GFC
+    if (i >= 32 && i <= 35) { mr = -0.080 + rn() * 0.012; br = -0.095 + rn() * 0.012; }
+    if (i >= 36 && i <= 38) { mr = -0.035 + rn() * 0.015; br = -0.045 + rn() * 0.015; }
+    if (i >= 39 && i <= 44) { mr =  0.042 + rn() * 0.018; br =  0.038 + rn() * 0.018; }
+    // COVID
+    if (i === 169) { mr = -0.15; br = -0.16; }
+    if (i === 170) { mr = -0.18; br = -0.20; }
+    if (i === 171) { mr =  0.10; br =  0.09; }
+    if (i === 172) { mr =  0.08; br =  0.06; }
+    if (i === 173) { mr =  0.06; br =  0.05; }
+
+    mP.push(Math.max(5, mP[mP.length - 1] * (1 + mr)));
+    bP.push(Math.max(5, bP[bP.length - 1] * (1 + br)));
+  }
+
+  const ms = 775 / mP[mP.length - 1];
+  const bs = 381 / bP[bP.length - 1];
+  const mF = mP.map(v => +(v * ms).toFixed(1));
+  const bF = bP.map(v => +(v * bs).toFixed(1));
+
+  const labels = [];
+  let yr = 2005, mo = 12;
+  for (let i = 0; i <= N; i++) {
+    if (i === 0) { labels.push('2005'); }
+    else if (mo === 1 && yr % 2 === 0) { labels.push(String(yr)); }
+    else { labels.push(''); }
+    mo++;
+    if (mo > 12) { mo = 1; yr++; }
+  }
+
+  const gc = 'rgba(255,255,255,0.05)';
+  const tc = 'rgba(255,255,255,0.35)';
+
+  new Chart(document.getElementById('perfChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Model',
+          data: mF,
+          borderColor: '#3fb950',
+          backgroundColor: 'rgba(63,185,80,0.07)',
+          borderWidth: 1.8,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+        {
+          label: 'Benchmark',
+          data: bF,
+          borderColor: '#58a6ff',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [5, 3],
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(0)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: gc },
+          ticks: {
+            color: tc,
+            font: { size: 10 },
+            autoSkip: false,
+            maxRotation: 0,
+            callback: (v, i) => labels[i] || null,
+          },
+        },
+        y: {
+          min: 50,
+          grid: { color: gc },
+          ticks: {
+            color: tc,
+            font: { size: 10 },
+            stepSize: 100,
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+buildChart();
+loadData();
+</script>
+</body>
+</html>

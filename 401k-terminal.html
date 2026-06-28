@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>401k Momentum Terminal</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --orange: #db6d28;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+  .header .subtitle { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .header-right { text-align: right; }
+  .last-updated { color: var(--muted); font-size: 11px; }
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    margin-top: 6px;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--border); }
+  .refresh-btn:disabled { color: var(--muted); cursor: wait; }
+
+  /* ── Main layout ── */
+  .main { padding: 20px 24px; }
+
+  /* ── Top picks banner ── */
+  .picks-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .picks-label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 120px;
+  }
+  .picks-label span {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 4px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .picks-funds {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+  }
+  .pick-card {
+    background: var(--surface2);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 14px 20px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .pick-rank {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green);
+    min-width: 28px;
+  }
+  .pick-info {}
+  .pick-ticker {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .pick-name {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .pick-score {
+    margin-left: auto;
+    text-align: right;
+  }
+  .pick-score .score-val {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--green);
+  }
+  .pick-score .score-label {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .stat-value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .stat-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+  /* ── Rankings table ── */
+  .section-title {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .rankings-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  thead th.right { text-align: right; }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.top-pick { background: rgba(63, 185, 80, 0.06); }
+  tbody td {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+  td.right { text-align: right; }
+  td.center { text-align: center; }
+
+  .rank-num {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 24px;
+    display: inline-block;
+  }
+  .rank-num.top { color: var(--green); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+  /* badge colors from ETFReplay scheme */
+  .badge-VINIX  { background: #1a2a4a; }
+  .badge-IWB    { background: #1a2a4a; }
+  .badge-AMFFX  { background: #1a2a4a; }
+  .badge-VISGX  { background: #1a2a4a; }
+  .badge-VSNGX  { background: #1a2a4a; }
+  .badge-VGTSX  { background: #e07b00; }
+  .badge-VEIEX  { background: #7b3fa0; }
+  .badge-VWEHX  { background: #155724; }
+  .badge-VBMFX  { background: #155724; }
+  .badge-VUSTX  { background: #155724; }
+  .badge-VMFXX  { background: #155724; }
+  .badge-SHY    { background: #155724; }
+  .badge-default { background: #30363d; }
+
+  .fund-name { color: var(--muted); font-size: 11px; margin-top: 1px; }
+
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .neu { color: var(--muted); }
+
+  .score-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .score-bar-bg {
+    width: 80px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+    transition: width 0.4s ease;
+  }
+  .score-bar-fill.neg-fill { background: var(--red); }
+  .score-val-td {
+    min-width: 60px;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .rec-tag {
+    background: var(--green);
+    color: #000;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+  .cash-tag {
+    background: var(--muted);
+    color: #000;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+
+  /* ── Loading / error states ── */
+  .status-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .status-bar.error { border-color: var(--red); }
+  .status-bar.success { border-color: var(--green); }
+  .status-bar.info { border-color: var(--accent); }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Footer note ── */
+  .footer {
+    color: var(--muted);
+    font-size: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    line-height: 1.6;
+  }
+
+  /* ── Method card ── */
+  .method-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 32px;
+  }
+  .method-item { }
+  .method-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .method-val { font-size: 13px; margin-top: 4px; }
+  .method-formula {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 8px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  /* hide when loading */
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>401k Momentum Terminal</h1>
+    <div class="subtitle">Dual Momentum Ranking &bull; Monthly Rebalance &bull; Top 2 Picks</div>
+  </div>
+  <div class="header-right">
+    <div class="last-updated" id="lastUpdated">Fetching data...</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="runModel()">Refresh Data</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Status bar -->
+  <div class="status-bar info" id="statusBar">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusMsg">Loading price data for all 12 funds...</span>
+  </div>
+
+  <!-- Methodology -->
+  <div class="method-card">
+    <div class="method-item">
+      <div class="method-label">Strategy</div>
+      <div class="method-val">Dual Momentum Rotation</div>
+    </div>
+    <div class="method-item">
+      <div class="method-label">Rebalance</div>
+      <div class="method-val">Monthly</div>
+    </div>
+    <div class="method-item">
+      <div class="method-label">Picks</div>
+      <div class="method-val">Top 2 Funds</div>
+    </div>
+    <div class="method-item">
+      <div class="method-label">Cash Proxy</div>
+      <div class="method-val">SHY (1-3yr T-Bond)</div>
+    </div>
+    <div class="method-formula">
+      Score = (6M Return &times; 30%) + (3M Return &times; 40%) &minus; (3M Volatility &times; 30%)
+    </div>
+  </div>
+
+  <!-- Top picks banner -->
+  <div class="picks-banner hidden" id="picksBanner">
+    <div class="picks-label">
+      This Month's<br>Allocation
+      <span id="picksMonth"></span>
+    </div>
+    <div class="picks-funds" id="picksFunds"></div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stats-row hidden" id="statsRow">
+    <div class="stat-card">
+      <div class="stat-label">Top Pick Score</div>
+      <div class="stat-value pos" id="stat1">--</div>
+      <div class="stat-sub" id="stat1sub">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">2nd Pick Score</div>
+      <div class="stat-value pos" id="stat2">--</div>
+      <div class="stat-sub" id="stat2sub">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cash Score (SHY)</div>
+      <div class="stat-value" id="stat3">--</div>
+      <div class="stat-sub">Defensive benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Funds Above Cash</div>
+      <div class="stat-value" id="stat4">--</div>
+      <div class="stat-sub">Positive momentum count</div>
+    </div>
+  </div>
+
+  <!-- Rankings table -->
+  <div class="section-title">Fund Rankings</div>
+  <div class="rankings-card hidden" id="rankingsCard">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">Rank</th>
+          <th>Fund</th>
+          <th class="right">6M Return</th>
+          <th class="right">3M Return</th>
+          <th class="right">3M Volatility</th>
+          <th class="right" style="width:180px">Score</th>
+        </tr>
+      </thead>
+      <tbody id="rankingsTbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer">
+  Data sourced from Yahoo Finance. Mutual fund NAVs update once daily after market close. &bull;
+  This terminal implements a momentum rotation model using weighted return and volatility scoring. &bull;
+  This is not investment advice. Past performance does not guarantee future results. &bull;
+  Review with your plan administrator before making allocation changes.
+</div>
+
+<script>
+// ── Fund universe ──────────────────────────────────────────────────────────
+const FUNDS = [
+  { ticker: 'AMFFX', name: 'American Mutual Fund Growth & Income',    cat: 'U.S. Equity'         },
+  { ticker: 'IWB',   name: 'iShares Russell 1000 Index Fund',         cat: 'U.S. Equity'         },
+  { ticker: 'SHY',   name: 'iShares 1-3 Year Treasury Bond ETF',      cat: 'Treasury / Cash'     },
+  { ticker: 'VBMFX', name: 'Vanguard Total Bond Market',              cat: 'Corp / Credit Bonds' },
+  { ticker: 'VEIEX', name: 'Vanguard Emerging Markets MF',            cat: 'Emerging Markets'    },
+  { ticker: 'VGTSX', name: "Vanguard Total Int'l Stock Index MF",     cat: 'International Equity'},
+  { ticker: 'VINIX', name: 'Vanguard Instl Index Fund (S&P 500)',     cat: 'U.S. Equity'         },
+  { ticker: 'VISGX', name: 'Vanguard Small Cap Growth Index Inv',     cat: 'U.S. Equity'         },
+  { ticker: 'VMFXX', name: 'Vanguard Money Market Mutual Fund',       cat: 'Treasury / Cash'     },
+  { ticker: 'VSNGX', name: 'JP Morgan Mid Cap Equity Instl',          cat: 'U.S. Equity'         },
+  { ticker: 'VUSTX', name: 'Vanguard Long-Term Treasury',             cat: 'Treasury'            },
+  { ticker: 'VWEHX', name: 'Vanguard High-Yield Bond MF',             cat: 'Corp / Credit Bonds' },
+];
+
+const CASH_TICKER = 'SHY';
+
+// Scoring weights
+const W_RETURN_6M  = 0.30;
+const W_RETURN_3M  = 0.40;
+const W_VOLATILITY = 0.30;
+
+// ── Colour map ─────────────────────────────────────────────────────────────
+const BADGE_COLORS = {
+  VINIX:  '#1e3a5f', IWB:   '#1e3a5f', AMFFX: '#1e3a5f',
+  VISGX:  '#1e3a5f', VSNGX: '#1e3a5f',
+  VGTSX:  '#c06800', VEIEX: '#6b2fa0',
+  VWEHX:  '#1a4731', VBMFX: '#1a4731', VUSTX: '#1a4731',
+  VMFXX:  '#155724', SHY:   '#155724',
+};
+
+// ── Yahoo Finance fetch ────────────────────────────────────────────────────
+async function fetchPrices(ticker) {
+  // Fetch ~7 months of monthly data to get 6m return + some buffer
+  const proxyBase = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+  const url = `${proxyBase}${ticker}?interval=1mo&range=9mo`;
+
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+
+  const chart = json.chart.result[0];
+  const closes = chart.indicators.adjclose?.[0]?.adjclose || chart.indicators.quote[0].close;
+  const timestamps = chart.timestamp;
+
+  // Filter out nulls
+  const data = timestamps.map((t, i) => ({ t, p: closes[i] })).filter(d => d.p != null);
+  return data;
+}
+
+function calcMetrics(data) {
+  // data = [{t, p}, ...] sorted oldest → newest
+  const n = data.length;
+  if (n < 2) return null;
+
+  const latest = data[n - 1].p;
+
+  // 6M return: price 6 periods ago vs latest
+  const idx6m = Math.max(0, n - 7); // 6 months back
+  const price6m = data[idx6m].p;
+  const ret6m = (latest - price6m) / price6m;
+
+  // 3M return
+  const idx3m = Math.max(0, n - 4); // 3 months back
+  const price3m = data[idx3m].p;
+  const ret3m = (latest - price3m) / price3m;
+
+  // 3M volatility: std dev of last 3 monthly returns
+  const last4 = data.slice(Math.max(0, n - 4));
+  const monthlyRets = [];
+  for (let i = 1; i < last4.length; i++) {
+    monthlyRets.push((last4[i].p - last4[i-1].p) / last4[i-1].p);
+  }
+  const meanR = monthlyRets.reduce((a, b) => a + b, 0) / monthlyRets.length;
+  const variance = monthlyRets.reduce((a, b) => a + Math.pow(b - meanR, 2), 0) / (monthlyRets.length || 1);
+  const vol3m = Math.sqrt(variance) * Math.sqrt(12); // annualized
+
+  const score = ret6m * W_RETURN_6M + ret3m * W_RETURN_3M - vol3m * W_VOLATILITY;
+
+  return { ret6m, ret3m, vol3m, score, latestPrice: latest };
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function pct(v, decimals = 1) {
+  if (v == null) return '--';
+  const s = (v * 100).toFixed(decimals) + '%';
+  return v >= 0 ? '+' + s : s;
+}
+function pctClass(v) {
+  if (v == null) return 'neu';
+  return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
+}
+function setStatus(msg, type='info', loading=false) {
+  const bar = document.getElementById('statusBar');
+  const sp  = document.getElementById('spinner');
+  const txt = document.getElementById('statusMsg');
+  bar.className = 'status-bar ' + type;
+  sp.style.display = loading ? 'block' : 'none';
+  txt.textContent = msg;
+}
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden');    }
+
+// ── Main ───────────────────────────────────────────────────────────────────
+async function runModel() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  hide('picksBanner');
+  hide('statsRow');
+  hide('rankingsCard');
+  setStatus('Fetching price data for all 12 funds from Yahoo Finance...', 'info', true);
+
+  const results = [];
+  const errors  = [];
+
+  for (const fund of FUNDS) {
+    try {
+      const data = await fetchPrices(fund.ticker);
+      const metrics = calcMetrics(data);
+      if (metrics) {
+        results.push({ ...fund, ...metrics });
+      } else {
+        errors.push(fund.ticker + ' (insufficient data)');
+      }
+    } catch (e) {
+      errors.push(fund.ticker + ' (' + e.message + ')');
+    }
+  }
+
+  if (results.length === 0) {
+    setStatus('Could not load any fund data. Check your internet connection or try again later.', 'error', false);
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+    return;
+  }
+
+  // Sort by score descending
+  results.sort((a, b) => b.score - a.score);
+
+  // Find SHY (cash) score
+  const cashFund = results.find(f => f.ticker === CASH_TICKER);
+  const cashScore = cashFund ? cashFund.score : 0;
+
+  // Top 2 picks
+  const picks = results.slice(0, 2);
+
+  // Score range for bar scaling
+  const maxAbsScore = Math.max(...results.map(r => Math.abs(r.score)));
+
+  // ── Render picks banner ──
+  const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  document.getElementById('picksMonth').textContent = month;
+  const picksHtml = picks.map((p, i) => `
+    <div class="pick-card">
+      <div class="pick-rank">#${i+1}</div>
+      <div class="pick-info">
+        <div class="pick-ticker">${p.ticker}</div>
+        <div class="pick-name">${p.name}</div>
+      </div>
+      <div class="pick-score">
+        <div class="score-val">${pct(p.score)}</div>
+        <div class="score-label">Score</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('picksFunds').innerHTML = picksHtml;
+  show('picksBanner');
+
+  // ── Stats row ──
+  document.getElementById('stat1').textContent    = pct(picks[0]?.score);
+  document.getElementById('stat1sub').textContent = picks[0]?.ticker || '--';
+  document.getElementById('stat2').textContent    = pct(picks[1]?.score);
+  document.getElementById('stat2sub').textContent = picks[1]?.ticker || '--';
+  const shy = results.find(f => f.ticker === 'SHY');
+  document.getElementById('stat3').textContent = shy ? pct(shy.score) : '--';
+  document.getElementById('stat3').className = 'stat-value ' + (shy ? pctClass(shy.score) : 'neu');
+  const aboveCash = results.filter(f => f.score > cashScore).length;
+  document.getElementById('stat4').textContent = aboveCash + ' / ' + results.length;
+  document.getElementById('stat4').className = 'stat-value ' + (aboveCash >= 2 ? 'pos' : 'neg');
+  show('statsRow');
+
+  // ── Rankings table ──
+  const tbody = document.getElementById('rankingsTbody');
+  tbody.innerHTML = results.map((f, idx) => {
+    const rank     = idx + 1;
+    const isTop    = rank <= 2;
+    const isCash   = f.ticker === CASH_TICKER;
+    const barPct   = maxAbsScore > 0 ? Math.abs(f.score) / maxAbsScore * 100 : 0;
+    const barClass = f.score >= 0 ? '' : 'neg-fill';
+    const color    = BADGE_COLORS[f.ticker] || '#30363d';
+
+    const tag = isTop
+      ? `<span class="rec-tag">&#10003; Pick</span>`
+      : isCash
+        ? `<span class="cash-tag">Cash</span>`
+        : '';
+
+    return `
+      <tr class="${isTop ? 'top-pick' : ''}">
+        <td><span class="rank-num ${isTop ? 'top' : ''}">${rank}</span></td>
+        <td>
+          <span class="badge" style="background:${color}">${f.ticker}</span>${tag}
+          <div class="fund-name">${f.name}</div>
+        </td>
+        <td class="right"><span class="${pctClass(f.ret6m)}">${pct(f.ret6m)}</span></td>
+        <td class="right"><span class="${pctClass(f.ret3m)}">${pct(f.ret3m)}</span></td>
+        <td class="right"><span class="${pctClass(-f.vol3m)}">${pct(f.vol3m)}</span></td>
+        <td class="right">
+          <div class="score-bar-wrap">
+            <div class="score-bar-bg">
+              <div class="score-bar-fill ${barClass}" style="width:${barPct.toFixed(1)}%"></div>
+            </div>
+            <span class="score-val-td ${pctClass(f.score)}">${pct(f.score)}</span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  show('rankingsCard');
+
+  // ── Status ──
+  const now = new Date().toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' });
+  document.getElementById('lastUpdated').textContent = 'Updated ' + now;
+
+  let statusMsg = `Ranked ${results.length} funds.`;
+  if (errors.length) statusMsg += ` Could not load: ${errors.join(', ')}.`;
+  setStatus(statusMsg, errors.length ? 'error' : 'success', false);
+
+  btn.disabled = false;
+  btn.textContent = 'Refresh Data';
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', runModel);
+</script>
+</body>
+</html>
