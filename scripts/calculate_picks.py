@@ -29,7 +29,7 @@ FUNDS = [
     {"ticker": "VGTSX", "name": "Vanguard Total Int'l Stock Index MF",  "category": "International Equity"},
     {"ticker": "VINIX", "name": "Vanguard Instl Index Fund (S&P 500)",  "category": "U.S. Equity"},
     {"ticker": "VISGX", "name": "Vanguard Small Cap Growth Index Inv",  "category": "U.S. Equity"},
-    {"ticker": "VMFXX", "name": "Vanguard Money Market Mutual Fund",    "category": "Treasury / Cash"},
+   
     {"ticker": "VSNGX", "name": "JP Morgan Mid Cap Equity Instl",       "category": "U.S. Equity"},
     {"ticker": "VUSTX", "name": "Vanguard Long-Term Treasury",          "category": "Treasury"},
     {"ticker": "VWEHX", "name": "Vanguard High-Yield Bond MF",          "category": "Corp / Credit Bonds"},
