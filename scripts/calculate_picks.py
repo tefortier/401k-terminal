@@ -63,9 +63,9 @@ BACKTEST_CHART_START = "2006-01"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def download_all(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers from {start}...", flush=True)
-    raw = yf.download(tickers, start=start, interval="1mo",
+def download_prices(tickers, start, interval="1mo"):
+    print(f"  Downloading {len(tickers)} tickers ({interval}) from {start}...", flush=True)
+    raw = yf.download(tickers, start=start, interval=interval,
                       progress=False, auto_adjust=True)
     if isinstance(raw.columns, pd.MultiIndex):
         prices = raw["Close"]
@@ -89,12 +89,15 @@ def backtest_stats(monthly_rets):
                 max_dd=round(max_dd, 4), total_return=round(total, 4))
 
 
-def run_model_backtest(prices, fund_tickers):
+def run_model_backtest(prices, daily_prices, fund_tickers):
     """
     Monthly rotation backtest: score funds at month-end, hold top 2 next month.
+    Volatility: daily std dev * sqrt(252) over trailing 63 trading days (matches ETFReplay).
     Returns (dates, cumulative_index, monthly_returns).
     """
-    rets = prices[fund_tickers].pct_change()
+    avail_daily = [t for t in fund_tickers if t in daily_prices.columns]
+    daily_rets = daily_prices[avail_daily].pct_change()
+
     dates, index_vals, monthly_rets = [], [], []
     cum = 100.0
 
@@ -104,6 +107,7 @@ def run_model_backtest(prices, fund_tickers):
             continue
 
         # Score using prices known at end of month t-1
+        month_end_date = prices.index[t - 1]
         scores = {}
         for tk in fund_tickers:
             try:
@@ -116,8 +120,12 @@ def run_model_backtest(prices, fund_tickers):
                     continue
                 r6 = (p0 - p6) / p6
                 r3 = (p0 - p3) / p3
-                vol_w = rets[tk].iloc[max(0, t-4):t-1].dropna()
-                vol = float(vol_w.std() * np.sqrt(12)) if len(vol_w) >= 2 else 0.10
+                # Daily vol: trailing 63 trading days ending at month_end_date
+                if tk in daily_rets.columns:
+                    d = daily_rets[tk][daily_rets.index <= month_end_date].dropna().iloc[-63:]
+                    vol = float(d.std() * np.sqrt(252)) if len(d) >= 20 else 0.10
+                else:
+                    vol = 0.10
                 scores[tk] = r6 * W_6M + r3 * W_3M - vol * W_VOL
             except Exception:
                 continue
@@ -179,8 +187,8 @@ def run_benchmark(prices, components, model_dates):
 
 
 # ── Current picks (today's scores) ───────────────────────────────────────────
-def current_picks(prices):
-    rets = prices.pct_change()
+def current_picks(prices, daily_prices):
+    rets = daily_prices.pct_change()
     results, errors = [], []
     n = len(prices)
 
@@ -198,7 +206,12 @@ def current_picks(prices):
                 continue
             r6  = (p0 - p6) / p6
             r3  = (p0 - p3) / p3
-            vol = float(rets[tk].dropna().iloc[-3:].std() * np.sqrt(12))
+            # Daily vol: trailing 63 trading days (matches ETFReplay)
+            if tk in rets.columns:
+                d = rets[tk].dropna().iloc[-63:]
+                vol = float(d.std() * np.sqrt(252)) if len(d) >= 20 else 0.10
+            else:
+                vol = 0.10
             score = r6 * W_6M + r3 * W_3M - vol * W_VOL
             results.append({**fund,
                             "ret_6m": round(r6, 6), "ret_3m": round(r3, 6),
@@ -223,7 +236,8 @@ def main():
                           for tk, _ in b["components"]})
     all_tickers   = list(set(fund_tickers + bench_tickers))
 
-    prices = download_all(all_tickers, BACKTEST_START)
+    prices = download_prices(all_tickers, BACKTEST_START, interval="1mo")
+    daily  = download_prices(all_tickers, BACKTEST_START, interval="1d")
     avail  = [t for t in all_tickers if t in prices.columns]
     print(f"  Loaded {len(avail)}/{len(all_tickers)} tickers | "
           f"{prices.index[0].strftime('%Y-%m')} → {prices.index[-1].strftime('%Y-%m')}")
@@ -231,7 +245,7 @@ def main():
     # ── Current picks ──────────────────────────────────────────────────────────
     print("\nComputing current picks...")
     fund_prices = prices[[t for t in fund_tickers if t in prices.columns]]
-    rankings, errors = current_picks(fund_prices)
+    rankings, errors = current_picks(fund_prices, daily)
 
     cash_row   = next((r for r in rankings if r["ticker"] == CASH_TICKER), None)
     cash_score = cash_row["score"] if cash_row else 0.0
@@ -244,7 +258,7 @@ def main():
     # ── Model backtest ─────────────────────────────────────────────────────────
     print("\nRunning model backtest...")
     avail_funds = [t for t in fund_tickers if t in prices.columns]
-    model_dates, model_vals, model_monthly = run_model_backtest(prices, avail_funds)
+    model_dates, model_vals, model_monthly = run_model_backtest(prices, daily, avail_funds)
     model_stats = backtest_stats(model_monthly)
     print(f"  {len(model_dates)} months | CAGR {model_stats['cagr']*100:.1f}% "
           f"| Sharpe {model_stats['sharpe']:.2f} | MaxDD {model_stats['max_dd']*100:.1f}%")
