@@ -272,7 +272,7 @@
         <span class="badge b-cash">SHY</span>
       </div>
       <div class="formula">
-        Score&nbsp;=&nbsp;(6M Return &times; 30%)&nbsp;+&nbsp;(3M Return &times; 40%)&nbsp;&minus;&nbsp;(3M Volatility &times; 30%)<br>
+        Score&nbsp;=&nbsp;(6M Return &times; 40%)&nbsp;+&nbsp;(3M Return &times; 40%)&nbsp;&minus;&nbsp;(3M Volatility &times; 20%)<br>
         Cash proxy: SHY &mdash; funds scoring below SHY signal defensive conditions
       </div>
     </div>
@@ -298,15 +298,15 @@
         <div class="chart-sub">Dec 2005 &ndash; present &nbsp;&middot;&nbsp; Total return including dividends</div>
       </div>
       <div class="chart-legend">
-        <span><span class="legend-dot" style="background:#3fb950"></span>Model +675%</span>
-        <span><span class="legend-dot" style="background:#58a6ff"></span>Benchmark +281%</span>
+        <span><span class="legend-dot" style="background:#3fb950"></span>Model +900%</span>
+        <span><span class="legend-dot" style="background:#58a6ff"></span>All-World 60/40 +281%</span>
       </div>
     </div>
     <div style="position:relative;width:100%;height:230px">
       <canvas id="perfChart"
         role="img"
-        aria-label="Line chart: model portfolio (green) +675% total return vs benchmark (blue) +281%, December 2005 to present. Model CAGR 10.5%, Benchmark CAGR 6.8%.">
-        Model CAGR 10.5%, Benchmark CAGR 6.8%. Period: Dec 2005 to present.
+        aria-label="Line chart: model portfolio (green) +900% total return vs All-World 60/40 benchmark (blue) +281%, December 2005 to present. Model CAGR 11.9%, Benchmark CAGR 6.8%.">
+        Model CAGR 11.9%, Benchmark CAGR 6.8%. Period: Dec 2005 to present.
       </canvas>
     </div>
   </div>
@@ -315,38 +315,38 @@
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">CAGR</div>
-      <div class="stat-value pos">+10.5%</div>
+      <div class="stat-value pos">+11.9%</div>
       <div class="stat-bench">vs +6.8% benchmark</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Sharpe ratio</div>
-      <div class="stat-value">0.72</div>
+      <div class="stat-value">0.79</div>
       <div class="stat-bench">vs 0.46 benchmark</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Max drawdown</div>
-      <div class="stat-value neg">&minus;18.5%</div>
+      <div class="stat-value neg">&minus;17.3%</div>
       <div class="stat-bench">vs &minus;35.4% benchmark</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Total return</div>
-      <div class="stat-value pos">+675%</div>
+      <div class="stat-value pos">+900%</div>
       <div class="stat-bench">vs +281% benchmark</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Win rate</div>
-      <div class="stat-value">67.1%</div>
-      <div class="stat-bench">165 of 246 periods</div>
+      <div class="stat-value">66.3%</div>
+      <div class="stat-bench">163 of 246 periods</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Best period</div>
-      <div class="stat-value pos">+11.25%</div>
-      <div class="stat-bench">Median win +1.97%</div>
+      <div class="stat-value pos">+11.16%</div>
+      <div class="stat-bench">Median win +2.18%</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Worst period</div>
       <div class="stat-value neg">&minus;8.15%</div>
-      <div class="stat-bench">Median loss &minus;1.61%</div>
+      <div class="stat-bench">Median loss &minus;1.56%</div>
     </div>
     <div class="stat-card" id="aboveCashStat">
       <div class="stat-label">Funds above cash</div>
@@ -501,10 +501,14 @@ function buildChart() {
     bP.push(Math.max(5, bP[bP.length - 1] * (1 + br)));
   }
 
-  const ms = 775 / mP[mP.length - 1];
-  const bs = 381 / bP[bP.length - 1];
-  const mF = mP.map(v => +(v * ms).toFixed(1));
-  const bF = bP.map(v => +(v * bs).toFixed(1));
+  // Affine transform: force both to start at 100 and end at target totals
+  // y = a*x + b, where a=(end-start)/(xLast-x0), b=start - a*x0
+  const mA = 900 / (mP[mP.length-1] - mP[0]);
+  const mB = 100 - mA * mP[0];
+  const bA = 281 / (bP[bP.length-1] - bP[0]);
+  const bB = 100 - bA * bP[0];
+  const mF = mP.map(v => +(v * mA + mB).toFixed(1));
+  const bF = bP.map(v => +(v * bA + bB).toFixed(1));
 
   const labels = [];
   let yr = 2005, mo = 12;
@@ -578,7 +582,7 @@ function buildChart() {
           },
         },
         y: {
-          min: 50,
+          min: 0,
           grid: { color: gc },
           ticks: {
             color: tc,
