@@ -4,13 +4,7 @@ Runs via GitHub Actions on the 1st of each month.
 
 Scoring:  (6M Return × 30%) + (3M Return × 40%) - (Volatility × 30%)
 Vol method: daily std × sqrt(252) over trailing 63 trading days (matches ETFReplay)
-
-Execution methodology:
-  - SCORE at close of last trading day of month M
-  - BUY   at open  of first trading day of month M+1
-  - SELL  at close of last  trading day of month M+1
-  - RETURN = last_day_close(M+1) / first_day_open(M+1) - 1
-
+Returns:  month-end close to month-end close (institutional standard)
 Cash proxy: SHY | Top 2 funds held equal-weight | No vol targeting overlay
 """
 
@@ -71,35 +65,19 @@ BACKTEST_CHART_START = "2006-01"
 
 # ── Download & resample ───────────────────────────────────────────────────────
 def download_daily(tickers, start):
-    print(f"  Downloading {len(tickers)} tickers (daily OHLC)...", flush=True)
+    print(f"  Downloading {len(tickers)} tickers (daily)...", flush=True)
     raw = yf.download(tickers, start=start, interval="1d",
                       progress=False, auto_adjust=True)
-    if isinstance(raw.columns, pd.MultiIndex):
-        close = raw["Close"].ffill(limit=5)
-        open_ = raw["Open"].ffill(limit=5)
-    else:
-        close = raw[["Close"]].rename(columns={"Close": tickers[0]}).ffill(limit=5) \
-                if len(tickers) == 1 else raw.ffill(limit=5)
-        open_ = raw[["Open"]].rename(columns={"Open": tickers[0]}).ffill(limit=5) \
-                if len(tickers) == 1 else raw.ffill(limit=5)
-    return close, open_
+    prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw
+    return prices.ffill(limit=5)
 
 
-def to_month_end_close(close_prices):
-    """Last trading day CLOSE of each month — for scoring lookbacks and sell prices."""
+def to_month_end(daily_prices):
+    """Last trading day adjusted close of each month."""
     try:
-        out = close_prices.resample('ME').last()
+        out = daily_prices.resample('ME').last()
     except ValueError:
-        out = close_prices.resample('M').last()
-    return out.ffill(limit=2)
-
-
-def to_month_start_open(open_prices):
-    """First trading day OPEN of each month — buy price."""
-    try:
-        out = open_prices.resample('MS').first()
-    except ValueError:
-        out = open_prices.resample('BMS').first()
+        out = daily_prices.resample('M').last()
     return out.ffill(limit=2)
 
 
@@ -128,42 +106,32 @@ def backtest_stats(monthly_rets):
 
 
 # ── Model backtest ────────────────────────────────────────────────────────────
-def run_model_backtest(me_close, fd_open, daily_close, fund_tickers):
+def run_model_backtest(monthly, daily, fund_tickers):
     """
-    Score at month-end close. Hold from first-day open to last-day close.
-    me_close and fd_open both indexed monthly (one row per month).
-    me_close.iloc[t]  = last trading day close of month t  (sell price / scoring price)
-    fd_open.iloc[t]   = first trading day open of month t  (buy price)
-    Return(t) = me_close.iloc[t] / fd_open.iloc[t] - 1
+    Score at month-end t-1, earn month-end-to-month-end return in period t.
+    Institutional standard: adjusted close to adjusted close.
     """
-    d_rets = daily_close[[tk for tk in fund_tickers
-                          if tk in daily_close.columns]].pct_change()
-
-    avail = [tk for tk in fund_tickers
-             if tk in me_close.columns and tk in fd_open.columns]
-
-    # Align fd_open to me_close by position (both monthly, one row per month)
-    # Trim fd_open to match me_close length if needed
-    fd_aligned = fd_open[avail].iloc[:len(me_close)].values  # numpy array for fast lookup
+    d_rets = daily[[tk for tk in fund_tickers if tk in daily.columns]].pct_change()
+    m_rets = monthly[fund_tickers].pct_change()
 
     dates, index_vals, monthly_rets = [], [], []
     cum = 100.0
 
-    for t in range(1, len(me_close)):
-        date_str = me_close.index[t].strftime("%Y-%m")
+    for t in range(1, len(monthly)):
+        date_str = monthly.index[t].strftime("%Y-%m")
         if date_str < BACKTEST_CHART_START:
             continue
 
-        as_of  = me_close.index[t - 1]   # score at end of previous month
+        as_of  = monthly.index[t - 1]
         scores = {}
 
-        for tk in avail:
+        for tk in fund_tickers:
             try:
                 if t < 7:
                     continue
-                p0 = me_close[tk].iloc[t - 1]   # current month-end close (score date)
-                p6 = me_close[tk].iloc[t - 7]   # 6 months ago month-end close
-                p3 = me_close[tk].iloc[t - 4]   # 3 months ago month-end close
+                p0 = monthly[tk].iloc[t - 1]
+                p6 = monthly[tk].iloc[t - 7]
+                p3 = monthly[tk].iloc[t - 4]
                 if any(pd.isna(x) for x in [p0, p6, p3]):
                     continue
                 r6  = (p0 - p6) / p6
@@ -179,20 +147,9 @@ def run_model_backtest(me_close, fd_open, daily_close, fund_tickers):
             monthly_rets.append(0.0)
             continue
 
-        picks = sorted(scores, key=scores.get, reverse=True)[:TOP_N]
-
-        # Return = last-day close / first-day open — 1 (same month t)
-        rets = []
-        for tk in picks:
-            try:
-                sell = me_close[tk].iloc[t]    # last trading day close of month t
-                buy  = fd_open[tk].iloc[t]     # first trading day open of month t
-                if pd.isna(sell) or pd.isna(buy) or buy == 0:
-                    continue
-                rets.append((sell - buy) / buy)
-            except Exception:
-                continue
-
+        picks  = sorted(scores, key=scores.get, reverse=True)[:TOP_N]
+        rets   = [m_rets[tk].iloc[t] for tk in picks
+                  if not pd.isna(m_rets[tk].iloc[t])]
         port_r = float(np.mean(rets)) if rets else 0.0
         cum   *= (1 + port_r)
 
@@ -204,11 +161,9 @@ def run_model_backtest(me_close, fd_open, daily_close, fund_tickers):
 
 
 # ── Benchmark backtest ────────────────────────────────────────────────────────
-def run_benchmark(me_close, fd_open, components, model_dates):
-    """Same open-to-close execution as model, monthly rebalanced."""
+def run_benchmark(monthly, components, model_dates):
     date_set = set(model_dates)
-    tickers  = [tk for tk, w in components
-                if tk in me_close.columns and tk in fd_open.columns]
+    tickers  = [tk for tk, w in components if tk in monthly.columns]
     if not tickers:
         return []
 
@@ -216,23 +171,16 @@ def run_benchmark(me_close, fd_open, components, model_dates):
     total_w = sum(weights.values())
     weights = {tk: w / total_w for tk, w in weights.items()}
 
+    rets       = monthly[tickers].pct_change()
     index_vals = []
     cum        = 100.0
 
-    for t in range(1, len(me_close)):
-        date_str = me_close.index[t].strftime("%Y-%m")
+    for t in range(1, len(monthly)):
+        date_str = monthly.index[t].strftime("%Y-%m")
         if date_str < BACKTEST_CHART_START or date_str not in date_set:
             continue
-        r = 0.0
-        for tk, w in weights.items():
-            try:
-                sell = me_close[tk].iloc[t]
-                buy  = fd_open[tk].iloc[t]
-                if pd.isna(sell) or pd.isna(buy) or buy == 0:
-                    continue
-                r += ((sell - buy) / buy) * w
-            except Exception:
-                continue
+        r = sum(rets[tk].iloc[t] * w for tk, w in weights.items()
+                if not pd.isna(rets[tk].iloc[t]))
         cum *= (1 + r)
         index_vals.append(round(cum, 2))
 
@@ -240,24 +188,23 @@ def run_benchmark(me_close, fd_open, components, model_dates):
 
 
 # ── Current picks ─────────────────────────────────────────────────────────────
-def current_picks(me_close, daily_close):
-    """Score all funds using latest month-end close prices."""
+def current_picks(monthly, daily):
     fund_tickers = [f["ticker"] for f in FUNDS]
-    d_rets       = daily_close[[tk for tk in fund_tickers
-                                if tk in daily_close.columns]].pct_change()
+    d_rets       = daily[[tk for tk in fund_tickers
+                          if tk in daily.columns]].pct_change()
     results, errors = [], []
-    n     = len(me_close)
-    as_of = me_close.index[-1]
+    n     = len(monthly)
+    as_of = monthly.index[-1]
 
     for fund in FUNDS:
         tk = fund["ticker"]
-        if tk not in me_close.columns:
+        if tk not in monthly.columns:
             errors.append(tk)
             continue
         try:
-            p0 = float(me_close[tk].iloc[-1])
-            p6 = float(me_close[tk].iloc[max(0, n - 7)])
-            p3 = float(me_close[tk].iloc[max(0, n - 4)])
+            p0 = float(monthly[tk].iloc[-1])
+            p6 = float(monthly[tk].iloc[max(0, n - 7)])
+            p3 = float(monthly[tk].iloc[max(0, n - 4)])
             if any(np.isnan(x) for x in [p0, p6, p3]):
                 errors.append(tk)
                 continue
@@ -288,25 +235,22 @@ def main():
     now = datetime.now()
     print(f"\n401k momentum model — {now.strftime('%Y-%m-%d %H:%M')}")
     print(f"  6M×{W_6M:.0%} + 3M×{W_3M:.0%} - Vol×{W_VOL:.0%} | Top {TOP_N} | Cash: {CASH_TICKER}")
-    print(f"  Execution: score month-end close | buy first-day open | sell last-day close")
 
     fund_tickers  = [f["ticker"] for f in FUNDS]
     bench_tickers = list({tk for b in BENCHMARKS.values() for tk, _ in b["components"]})
     all_tickers   = list(set(fund_tickers + bench_tickers))
 
-    daily_close, daily_open = download_daily(all_tickers, BACKTEST_START)
+    daily   = download_daily(all_tickers, BACKTEST_START)
+    monthly = to_month_end(daily)
 
-    me_close = to_month_end_close(daily_close)    # last day close — score + sell
-    fd_open  = to_month_start_open(daily_open)    # first day open — buy
-
-    avail = [tk for tk in all_tickers if tk in me_close.columns]
+    avail = [tk for tk in all_tickers if tk in monthly.columns]
     print(f"  {len(avail)}/{len(all_tickers)} tickers | "
-          f"{me_close.index[0].strftime('%Y-%m')} → {me_close.index[-1].strftime('%Y-%m')}")
+          f"{monthly.index[0].strftime('%Y-%m')} → {monthly.index[-1].strftime('%Y-%m')}")
 
     # ── Current picks ──────────────────────────────────────────────────────────
     print("\nComputing current picks...")
-    fund_me          = me_close[[tk for tk in fund_tickers if tk in me_close.columns]]
-    rankings, errors = current_picks(fund_me, daily_close)
+    fund_monthly     = monthly[[tk for tk in fund_tickers if tk in monthly.columns]]
+    rankings, errors = current_picks(fund_monthly, daily)
 
     cash_row   = next((r for r in rankings if r["ticker"] == CASH_TICKER), None)
     cash_score = cash_row["score"] if cash_row else 0.0
@@ -319,11 +263,8 @@ def main():
 
     # ── Model backtest ─────────────────────────────────────────────────────────
     print("\nRunning model backtest...")
-    avail_funds = [tk for tk in fund_tickers
-                   if tk in me_close.columns and tk in fd_open.columns]
-    model_dates, model_vals, model_monthly = run_model_backtest(
-        me_close, fd_open, daily_close, avail_funds
-    )
+    avail_funds = [tk for tk in fund_tickers if tk in monthly.columns]
+    model_dates, model_vals, model_monthly = run_model_backtest(monthly, daily, avail_funds)
     model_stats = backtest_stats(model_monthly)
     print(f"  {len(model_dates)} months | CAGR {model_stats['cagr']*100:.1f}% | "
           f"Sharpe {model_stats['sharpe']:.2f} | MaxDD {model_stats['max_dd']*100:.1f}%")
@@ -332,12 +273,11 @@ def main():
     bench_out = {}
     for key, bench in BENCHMARKS.items():
         print(f"  Benchmark {bench['name']}...", end=" ", flush=True)
-        components = [(tk, w) for tk, w in bench["components"]
-                      if tk in me_close.columns and tk in fd_open.columns]
+        components = [(tk, w) for tk, w in bench["components"] if tk in monthly.columns]
         if not components:
             print("SKIPPED")
             continue
-        vals    = run_benchmark(me_close, fd_open, components, model_dates)
+        vals    = run_benchmark(monthly, components, model_dates)
         idx     = np.array([100.0] + vals)
         b_rets  = np.diff(idx) / idx[:-1]
         b_stats = backtest_stats(b_rets)
