@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,16 +7,18 @@
 <title>401k Momentum Terminal — The Automatic 401k</title>
 <style>
   :root {
-    --bg:       #0d1117;
-    --surface:  #161b22;
-    --surface2: #21262d;
-    --border:   #30363d;
-    --text:     #e6edf3;
-    --muted:    #8b949e;
-    --accent:   #58a6ff;
-    --green:    #3fb950;
-    --red:      #f85149;
-    --green-dim: rgba(63,185,80,0.08);
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #21262d;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --dim:       #484f58;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --red:       #f85149;
+    --green-dim: rgba(63,185,80,0.07);
+    --accent-dim: rgba(88,166,255,0.08);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -27,11 +30,11 @@
     line-height: 1.5;
   }
 
-  /* ── Layout ── */
+  /* ── Header ── */
   .header {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 16px 28px;
+    padding: 15px 28px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -39,7 +42,7 @@
     top: 0;
     z-index: 10;
   }
-  .header-left h1 { font-size: 17px; font-weight: 600; color: var(--accent); }
+  .header-left h1 { font-size: 16px; font-weight: 600; color: var(--accent); letter-spacing: -0.2px; }
   .header-left .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .header-right { text-align: right; }
   .last-updated { font-size: 11px; color: var(--muted); }
@@ -58,14 +61,14 @@
   .refresh-btn:hover { background: var(--border); }
   .refresh-btn:disabled { color: var(--muted); cursor: wait; }
 
-  .main { max-width: 1100px; margin: 0 auto; padding: 20px 28px 40px; }
+  .main { max-width: 1080px; margin: 0 auto; padding: 20px 28px 48px; }
 
-  /* ── Status bar ── */
+  /* ── Status ── */
   .status-bar {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 16px;
+    padding: 10px 16px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface2);
@@ -73,10 +76,10 @@
     margin-bottom: 18px;
     transition: border-color 0.2s;
   }
-  .status-bar.success { border-color: var(--green); }
-  .status-bar.error   { border-color: var(--red);   }
+  .status-bar.ok    { border-color: var(--green); }
+  .status-bar.error { border-color: var(--red);   }
   .spinner {
-    width: 13px; height: 13px;
+    width: 12px; height: 12px;
     border: 2px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
@@ -85,7 +88,7 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Top grid ── */
+  /* ── Layout grid ── */
   .top-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -93,31 +96,30 @@
     margin-bottom: 14px;
     align-items: start;
   }
-  @media (max-width: 700px) { .top-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 680px) { .top-grid { grid-template-columns: 1fr; } }
 
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 14px 16px;
+    padding: 16px;
   }
   .card-label {
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
-    color: var(--muted);
-    margin-bottom: 10px;
-    font-weight: 500;
+    letter-spacing: 0.8px;
+    color: var(--dim);
+    margin-bottom: 12px;
+    font-weight: 600;
   }
 
-  /* ── Fund Universe ── */
+  /* ── Universe card ── */
   .cat-label {
     font-size: 10px;
-    color: #555d68;
-    margin-bottom: 4px;
-    margin-top: 8px;
+    color: var(--dim);
+    margin: 9px 0 4px;
   }
-  .cat-label:first-child { margin-top: 0; }
+  .cat-label:first-of-type { margin-top: 0; }
   .badges { display: flex; flex-wrap: wrap; gap: 5px; }
   .badge {
     display: inline-block;
@@ -126,73 +128,80 @@
     font-size: 11px;
     font-weight: 600;
     color: #fff;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.3px;
   }
   .b-us   { background: #1a3560; }
   .b-intl { background: #7a4200; }
   .b-emrg { background: #3d2680; }
   .b-corp { background: #0d4030; }
-  .b-cash { background: #1a4020; }
+  .b-cash { background: #1e3a1e; }
 
   .formula {
-    margin-top: 10px;
+    margin-top: 12px;
     padding-top: 10px;
     border-top: 1px solid var(--border);
     font-size: 10px;
-    color: #555d68;
-    line-height: 1.6;
+    color: var(--dim);
+    line-height: 1.7;
   }
+  .formula strong { color: var(--muted); }
 
   /* ── Picks ── */
   .picks-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 9px;
+    margin-bottom: 14px;
   }
   .pick-card {
     border: 1.5px solid var(--green);
     border-radius: 8px;
-    padding: 11px 13px;
+    padding: 12px 14px;
     background: var(--green-dim);
   }
-  .pick-rank  { font-size: 10px; color: var(--green); font-weight: 600; }
-  .pick-ticker { font-size: 20px; font-weight: 600; color: var(--text); }
-  .pick-name  { font-size: 10px; color: var(--muted); margin-top: 1px; }
-  .pick-score { font-size: 15px; font-weight: 600; color: var(--green); margin-top: 5px; }
+  .pick-rank   { font-size: 10px; color: var(--green); font-weight: 600; letter-spacing: 0.4px; }
+  .pick-class  { font-size: 17px; font-weight: 700; color: var(--text); margin: 4px 0 3px; line-height: 1.25; }
+  .pick-ticker { font-size: 10px; color: var(--muted); }
+  .pick-alloc  { font-size: 14px; font-weight: 600; color: var(--green); margin-top: 7px; }
 
   /* ── Rankings table ── */
-  .rank-section-label {
+  .section-label {
     font-size: 10px;
-    color: #555d68;
+    color: var(--dim);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
+    letter-spacing: 0.6px;
+    margin-bottom: 7px;
   }
   .rank-table { width: 100%; border-collapse: collapse; }
   .rank-table tr { border-bottom: 1px solid var(--border); }
   .rank-table tr:last-child { border-bottom: none; }
   .rank-table tr.top-pick { background: var(--green-dim); }
-  .rank-table td { padding: 6px 4px; font-size: 11px; }
-  .rank-num { font-weight: 600; color: var(--muted); width: 18px; }
-  .rank-num.top { color: var(--green); }
-  .score-row { display: flex; align-items: center; gap: 6px; }
-  .score-bar-bg { width: 52px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .score-bar-fill { height: 100%; border-radius: 2px; }
+  .rank-table td { padding: 5px 3px; font-size: 11px; vertical-align: middle; }
+  .rnum { font-weight: 600; color: var(--muted); width: 16px; text-align: right; padding-right: 6px; }
+  .rnum.top { color: var(--green); }
+  .score-wrap { display: flex; align-items: center; gap: 6px; }
+  .bar-bg { width: 48px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .bar-fg { height: 100%; border-radius: 2px; }
   .pos { color: var(--green); }
   .neg { color: var(--red); }
-  .check { color: var(--green); font-size: 11px; }
+  .chk { color: var(--green); font-size: 10px; }
 
-  /* ── Performance chart ── */
+  /* ── Chart ── */
   .chart-card { margin-bottom: 14px; }
-  .chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
   .chart-title { font-size: 13px; font-weight: 600; }
-  .chart-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .chart-legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); align-items: center; flex-wrap: wrap; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
-
-  /* ── Benchmark toggle ── */
-  .bench-toggle { display: flex; gap: 5px; margin-top: 8px; }
+  .chart-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .chart-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); align-items: center; }
+  .ldot { width: 10px; height: 3px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .bench-toggle { display: flex; gap: 5px; }
   .bench-btn {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -204,8 +213,8 @@
     font-size: 10px;
     transition: all 0.15s;
   }
-  .bench-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .bench-btn.active { background: #1a2a4a; border-color: var(--accent); color: var(--accent); }
+  .bench-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .bench-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
   /* ── Stats grid ── */
   .stats-grid {
@@ -213,16 +222,35 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
   }
-  @media (max-width: 700px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 680px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
   .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 11px 13px;
+    padding: 12px 14px;
   }
-  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-  .stat-value { font-size: 20px; font-weight: 600; margin-top: 3px; }
-  .stat-bench { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .stat-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.7px; }
+  .stat-value { font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--text); }
+  .stat-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Annual returns ── */
+  .ann-table { width: 100%; border-collapse: collapse; }
+  .ann-table tr { border-bottom: 1px solid var(--border); }
+  .ann-table tr:last-child { border-bottom: none; }
+  .ann-table td { padding: 5px 8px; font-size: 11px; vertical-align: middle; }
+  .ann-head td { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; padding-bottom: 6px; }
+  .ann-yr { font-weight: 600; color: var(--muted); width: 60px; }
+  .ann-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .ann-bar-bg { width: 60px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .ann-bar-fg { height: 100%; border-radius: 2px; }
+
+  /* ── Monthly heatmap ── */
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap { border-collapse: separate; border-spacing: 2px; width: 100%; min-width: 600px; }
+  .heatmap th { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 4px; text-align: center; font-weight: 600; }
+  .heatmap td { text-align: center; font-size: 9px; border-radius: 3px; padding: 5px 3px; min-width: 36px; }
+  .hm-yr { font-size: 10px; color: var(--muted); font-weight: 600; text-align: right !important; padding-right: 10px !important; background: transparent !important; }
+  .hm-annual { font-size: 10px; font-weight: 600; padding-left: 10px !important; background: transparent !important; }
 
   /* ── Footer ── */
   .footer {
@@ -230,24 +258,23 @@
     padding-top: 16px;
     border-top: 1px solid var(--border);
     font-size: 10px;
-    color: #555d68;
-    line-height: 1.7;
+    color: var(--dim);
+    line-height: 1.8;
   }
-  .footer a { color: var(--muted); }
-
-  .hidden { display: none !important; }
+  .footer a { color: var(--muted); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="header-left">
-    <h1>&#9650; 401k Momentum Terminal</h1>
+    <h1>▲ 401k Momentum Terminal</h1>
     <div class="sub">The Automatic 401k &nbsp;·&nbsp; Dual Momentum &nbsp;·&nbsp; Monthly Rebalance</div>
   </div>
   <div class="header-right">
-    <div class="last-updated" id="lastUpdated">Loading...</div>
-    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">&#8635; Refresh</button>
+    <div class="last-updated" id="lastUpdated">—</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">↺ Refresh</button>
   </div>
 </div>
 
@@ -255,78 +282,87 @@
 
   <div class="status-bar" id="statusBar">
     <div class="spinner" id="spinner"></div>
-    <span id="statusMsg">Loading monthly picks...</span>
+    <span id="statusMsg">Loading monthly picks…</span>
   </div>
 
-  <!-- Top grid -->
-  <div class="top-grid" id="topGrid">
+  <div class="top-grid">
 
     <!-- Fund Universe -->
     <div class="card">
-      <div class="card-label">Fund universe &mdash; 12 funds</div>
-      <div class="cat-label">U.S. equity</div>
+      <div class="card-label">Fund universe — 11 ETFs</div>
+
+      <div class="cat-label">U.S. Equity</div>
       <div class="badges">
-        <span class="badge b-us">AMFFX</span>
-        <span class="badge b-us">IWB</span>
-        <span class="badge b-us">VINIX</span>
-        <span class="badge b-us">VISGX</span>
-        <span class="badge b-us">VSNGX</span>
+        <span class="badge b-us">S&amp;P 500</span>
+        <span class="badge b-us">LG Cap Growth</span>
+        <span class="badge b-us">LG Cap Value</span>
+        <span class="badge b-us">Small Cap</span>
+        <span class="badge b-us">Mid Cap</span>
       </div>
-      <div class="cat-label">International equity</div>
-      <div class="badges"><span class="badge b-intl">VGTSX</span></div>
-      <div class="cat-label">Emerging markets</div>
-      <div class="badges"><span class="badge b-emrg">VEIEX</span></div>
-      <div class="cat-label">Corp / credit bonds</div>
+
+      <div class="cat-label">International Equity</div>
       <div class="badges">
-        <span class="badge b-corp">VWEHX</span>
-        <span class="badge b-corp">VBMFX</span>
+        <span class="badge b-intl">Intl Developed</span>
       </div>
-      <div class="cat-label">Treasury / cash</div>
+
+      <div class="cat-label">Emerging Markets</div>
       <div class="badges">
-        <span class="badge b-cash">VUSTX</span>
-        <span class="badge b-cash">VMFXX</span>
-        <span class="badge b-cash">SHY</span>
+        <span class="badge b-emrg">Emg Markets</span>
       </div>
+
+      <div class="cat-label">Fixed Income</div>
+      <div class="badges">
+        <span class="badge b-corp">Long Treasury</span>
+        <span class="badge b-corp">High Yield</span>
+        <span class="badge b-corp">Total Bond</span>
+      </div>
+
+      <div class="cat-label">Cash Proxy</div>
+      <div class="badges">
+        <span class="badge b-cash">Short Treasury</span>
+      </div>
+
       <div class="formula">
-        Score&nbsp;=&nbsp;(6M Return &times; 40%)&nbsp;+&nbsp;(3M Return &times; 40%)&nbsp;&minus;&nbsp;(3M Volatility &times; 20%)<br>
-        Cash proxy: SHY &mdash; funds scoring below SHY signal defensive conditions
+        <strong>Score</strong> = (6M Return × 30%) + (3M Return × 40%) − (Volatility × 30%)<br>
+        Top 2 funds held equal-weight, rebalanced monthly.<br>
+        Vol = daily std × √252 over 63 trading days.
       </div>
     </div>
 
-    <!-- Picks + Rankings -->
-    <div class="card" id="picksCard">
-      <div class="card-label" id="picksMonth">This month's allocation</div>
+    <!-- Picks & Rankings -->
+    <div class="card">
+      <div class="card-label" id="picksLabel">This month's allocation</div>
       <div class="picks-grid" id="picksGrid">
-        <div class="pick-card"><div class="pick-rank">Loading...</div></div>
-        <div class="pick-card"><div class="pick-rank">Loading...</div></div>
+        <div class="pick-card"><div class="pick-rank">Loading…</div></div>
+        <div class="pick-card"><div class="pick-rank">Loading…</div></div>
       </div>
-      <div class="rank-section-label">All fund rankings</div>
+      <div class="section-label">All fund rankings</div>
       <table class="rank-table" id="rankTable"><tbody></tbody></table>
     </div>
 
   </div><!-- /top-grid -->
 
-  <!-- Performance chart -->
+  <!-- Chart -->
   <div class="card chart-card">
     <div class="chart-header">
       <div>
-        <div class="chart-title">Portfolio performance &mdash; backtest</div>
-        <div class="chart-sub" id="chartSub">Loading backtest data...</div>
+        <div class="chart-title">Backtest performance</div>
+        <div class="chart-sub" id="chartSub">Loading…</div>
       </div>
-      <div>
-        <div class="chart-legend">
-          <span><span class="legend-dot" style="background:#3fb950"></span><span id="legendModel">Model</span></span>
-          <span><span class="legend-dot" style="background:#58a6ff"></span><span id="legendBench">Benchmark</span></span>
+      <div class="chart-right">
+        <div class="legend">
+          <span><span class="ldot" style="background:#3fb950;height:2px"></span><span id="lgModel">Model</span></span>
+          <span><span class="ldot" style="background:#58a6ff;height:2px"></span><span id="lgBench">Benchmark</span></span>
         </div>
-        <div class="bench-toggle" id="benchToggle">
-          <button class="bench-btn active" onclick="switchBenchmark('allworld6040')">All-World 60/40</button>
-          <button class="bench-btn" onclick="switchBenchmark('spy')">S&amp;P 500</button>
-          <button class="bench-btn" onclick="switchBenchmark('agg')">US Bonds</button>
+        <div class="bench-toggle">
+          <button class="bench-btn active" onclick="switchBench('allworld6040',this)">All-World 60/40</button>
+          <button class="bench-btn" onclick="switchBench('spy',this)">S&amp;P 500</button>
+          <button class="bench-btn" onclick="switchBench('agg',this)">US Bonds</button>
         </div>
       </div>
     </div>
-    <div style="position:relative;width:100%;height:230px">
-      <canvas id="perfChart" role="img" aria-label="Model portfolio vs benchmark backtest"></canvas>
+    <div style="position:relative;width:100%;height:220px">
+      <canvas id="perfChart"></canvas>
     </div>
   </div>
 
@@ -334,73 +370,108 @@
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">CAGR</div>
-      <div class="stat-value pos" id="statCagr">&mdash;</div>
-      <div class="stat-bench" id="statCagrBench">&mdash;</div>
+      <div class="stat-value pos" id="sCagr">—</div>
+      <div class="stat-sub" id="sCagrB">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Sharpe ratio</div>
-      <div class="stat-value" id="statSharpe">&mdash;</div>
-      <div class="stat-bench" id="statSharpeBench">&mdash;</div>
+      <div class="stat-label">Sharpe Ratio</div>
+      <div class="stat-value" id="sSharpe">—</div>
+      <div class="stat-sub" id="sSharpeB">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Max drawdown</div>
-      <div class="stat-value neg" id="statMaxdd">&mdash;</div>
-      <div class="stat-bench" id="statMaxddBench">&mdash;</div>
+      <div class="stat-label">Max Drawdown</div>
+      <div class="stat-value neg" id="sMdd">—</div>
+      <div class="stat-sub" id="sMddB">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Total return</div>
-      <div class="stat-value pos" id="statTotal">&mdash;</div>
-      <div class="stat-bench" id="statTotalBench">&mdash;</div>
+      <div class="stat-label">Total Return</div>
+      <div class="stat-value pos" id="sTotal">—</div>
+      <div class="stat-sub" id="sTotalB">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Periods</div>
-      <div class="stat-value" id="statPeriods">&mdash;</div>
-      <div class="stat-bench" id="statPeriodsSub">Monthly rebalance</div>
+      <div class="stat-label">Backtest Periods</div>
+      <div class="stat-value" id="sPeriods">—</div>
+      <div class="stat-sub">Monthly rebalance</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Benchmark</div>
-      <div class="stat-value" id="statBenchName" style="font-size:13px">&mdash;</div>
-      <div class="stat-bench" id="statBenchDesc">&mdash;</div>
+      <div class="stat-value" id="sBenchName" style="font-size:13px;margin-top:6px">—</div>
+      <div class="stat-sub" id="sBenchDesc">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Model vs bench DD</div>
-      <div class="stat-value pos" id="statDdDelta">&mdash;</div>
-      <div class="stat-bench">Drawdown advantage</div>
+      <div class="stat-label">DD Advantage</div>
+      <div class="stat-value pos" id="sDdAdv">—</div>
+      <div class="stat-sub">vs benchmark max DD</div>
     </div>
-    <div class="stat-card" id="aboveCashStat">
-      <div class="stat-label">Funds above cash</div>
-      <div class="stat-value" id="aboveCashVal">&mdash;</div>
-      <div class="stat-bench">Positive momentum count</div>
+    <div class="stat-card">
+      <div class="stat-label">Funds Above Cash</div>
+      <div class="stat-value" id="sAboveCash">—</div>
+      <div class="stat-sub">Positive momentum count</div>
+    </div>
+  </div>
+
+  <!-- Annual Returns -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-label" id="annLabel">Annual returns — model vs benchmark</div>
+    <table class="ann-table" id="annTable">
+      <thead>
+        <tr class="ann-head">
+          <td>Year</td>
+          <td>Model</td>
+          <td id="annBenchHead">Benchmark</td>
+          <td>vs Bench</td>
+        </tr>
+      </thead>
+      <tbody id="annBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Monthly Heatmap -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-label">Monthly returns — model</div>
+    <div class="heatmap-wrap">
+      <table class="heatmap" id="heatmapTable">
+        <thead>
+          <tr>
+            <th style="text-align:right;padding-right:10px">Year</th>
+            <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+            <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+            <th style="padding-left:10px">Full Yr</th>
+          </tr>
+        </thead>
+        <tbody id="heatmapBody"></tbody>
+      </table>
     </div>
   </div>
 
   <div class="footer">
-    Data updated automatically on the 1st of each month via GitHub Actions &middot; Yahoo Finance price data &middot;
-    This terminal is for educational and informational purposes only. It is not investment advice.
-    Past performance does not guarantee future results. Review changes with your plan administrator before rebalancing. &middot;
-    <a href="https://automaticretirement.substack.com" target="_blank">The Automatic 401k</a>
+    Auto-updated on the 1st of each month via GitHub Actions · Yahoo Finance price data (dividend-adjusted) ·
+    For educational purposes only — not investment advice. Past performance does not guarantee future results.
+    Review any changes with your plan administrator before rebalancing. ·
+    <a href="https://automaticretirement.substack.com" target="_blank">The Automatic 401k ↗</a>
   </div>
 
 </div><!-- /main -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-
-// ── State ────────────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 const BADGE = {
-  AMFFX:'b-us', IWB:'b-us', VINIX:'b-us', VISGX:'b-us', VSNGX:'b-us',
-  VGTSX:'b-intl', VEIEX:'b-emrg',
-  VWEHX:'b-corp', VBMFX:'b-corp',
-  VUSTX:'b-cash', VMFXX:'b-cash', SHY:'b-cash',
+  SPY:'b-us', IWF:'b-us', IWD:'b-us', IWM:'b-us', IJH:'b-us',
+  EFA:'b-intl', EEM:'b-emrg',
+  TLT:'b-corp', HYG:'b-corp', AGG:'b-corp',
+  SHY:'b-cash',
 };
 
-let _chart = null;
-let _btData = null;       // full backtest section from data.json
+let _chart      = null;
+let _btData     = null;
 let _activeBench = 'allworld6040';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const pct = (v, d=1) => v == null ? '—'
   : (v >= 0 ? '+' : '') + (v * 100).toFixed(d) + '%';
+
+const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
 function setStatus(msg, type='', loading=false) {
   const bar = document.getElementById('statusBar');
@@ -409,137 +480,108 @@ function setStatus(msg, type='', loading=false) {
   document.getElementById('statusMsg').textContent = msg;
 }
 
-// ── Picks ────────────────────────────────────────────────────────────────────
+// ── Picks ─────────────────────────────────────────────────────────────────────
 function renderPicks(data) {
-  document.getElementById('picksMonth').textContent = data.month + ' — Recommended allocation';
+  set('picksLabel', data.month + ' — Recommended Allocation');
   document.getElementById('picksGrid').innerHTML = data.picks.map(p => `
     <div class="pick-card">
-      <div class="pick-rank">#${p.rank} pick</div>
-      <div class="pick-ticker">${p.ticker}</div>
-      <div class="pick-name">${p.name}</div>
-      <div class="pick-score">${pct(p.score)}</div>
+      <div class="pick-rank">#${p.rank} PICK</div>
+      <div class="pick-class">${p.name}</div>
+      <div class="pick-ticker">${p.ticker} · find equivalent in your plan</div>
+      <div class="pick-alloc">50% allocation</div>
     </div>`).join('');
 }
 
-// ── Rankings ─────────────────────────────────────────────────────────────────
+// ── Rankings ──────────────────────────────────────────────────────────────────
 function renderRankings(rankings) {
-  const maxAbs = Math.max(...rankings.map(r => Math.abs(r.score)));
+  const maxAbs = Math.max(...rankings.map(r => Math.abs(r.score)), 0.001);
   document.querySelector('#rankTable tbody').innerHTML = rankings.map(r => {
     const top  = r.rank <= 2;
-    const barW = maxAbs > 0 ? (Math.abs(r.score) / maxAbs * 54).toFixed(0) : 0;
-    const clr  = r.score >= 0 ? '#3fb950' : '#f85149';
+    const barW = (Math.abs(r.score) / maxAbs * 48).toFixed(0);
+    const clr  = r.score >= 0 ? 'var(--green)' : 'var(--red)';
     return `<tr class="${top ? 'top-pick' : ''}">
-      <td><span class="rank-num ${top ? 'top' : ''}">${r.rank}</span></td>
-      <td><span class="badge ${BADGE[r.ticker]||'b-us'}" style="font-size:10px;padding:1px 7px">${r.ticker}</span></td>
-      <td><div class="score-row">
-        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${barW}px;background:${clr}"></div></div>
+      <td><span class="rnum ${top ? 'top':''}">${r.rank}</span></td>
+      <td style="min-width:130px">
+        <div style="line-height:1.35">
+          <span style="font-size:11px;font-weight:${top?'600':'400'}">${r.name}</span><br>
+          <span style="font-size:9px;color:var(--dim)">${r.ticker}</span>
+        </div>
+      </td>
+      <td style="width:100%"><div class="score-wrap">
+        <div class="bar-bg"><div class="bar-fg" style="width:${barW}px;background:${clr}"></div></div>
         <span class="${r.score>=0?'pos':'neg'}" style="font-weight:600">${pct(r.score)}</span>
       </div></td>
-      <td style="width:16px">${top ? '<span class="check">✓</span>' : ''}</td>
+      <td><span class="chk">${top ? '✓' : ''}</span></td>
     </tr>`;
   }).join('');
 }
 
-// ── Backtest stats cards ──────────────────────────────────────────────────────
-function renderBacktestStats(benchKey) {
-  if (!_btData) return;
-  const ms  = _btData.model_stats;
-  const bnd = _btData.benchmarks?.[benchKey];
-  if (!ms) return;
-
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-
-  set('statCagr',      pct(ms.cagr));
-  set('statSharpe',    ms.sharpe?.toFixed(2) ?? '—');
-  set('statMaxdd',     pct(ms.max_dd));
-  set('statTotal',     pct(ms.total_return, 0));
-  set('statPeriods',   _btData.dates?.length + ' months');
-
-  if (bnd) {
-    const bs = bnd.stats;
-    set('statCagrBench',   'vs ' + pct(bs?.cagr) + ' ' + bnd.name);
-    set('statSharpeBench', 'vs ' + (bs?.sharpe?.toFixed(2) ?? '—') + ' ' + bnd.name);
-    set('statMaxddBench',  'vs ' + pct(bs?.max_dd) + ' ' + bnd.name);
-    set('statTotalBench',  'vs ' + pct(bs?.total_return, 0) + ' ' + bnd.name);
-    set('statBenchName',   bnd.name);
-    set('statBenchDesc',   bnd.description ?? '');
-    const ddDelta = (ms.max_dd ?? 0) - (bs?.max_dd ?? 0);
-    set('statDdDelta', pct(ddDelta));
-  }
-}
-
-// ── Chart ────────────────────────────────────────────────────────────────────
+// ── Chart ─────────────────────────────────────────────────────────────────────
 function buildChart(btData, benchKey) {
   if (!btData) return;
-  const dates  = btData.dates  ?? [];
-  const model  = btData.model  ?? [];
-  const bnd    = btData.benchmarks?.[benchKey];
-  const bData  = bnd?.data ?? [];
+  const dates = btData.dates  || [];
+  const model = btData.model  || [];
+  const bnd   = btData.benchmarks?.[benchKey];
+  const bData = bnd?.data || [];
 
-  // X-axis: show year label every 2 years
-  const labels = dates.map((d, i) => {
-    const yr = parseInt(d.slice(0, 4));
-    const mo = parseInt(d.slice(5, 7));
+  const labels = dates.map(d => {
+    const yr = +d.slice(0,4), mo = +d.slice(5,7);
     return (mo === 1 && yr % 2 === 0) ? String(yr) : '';
   });
 
-  const gc = 'rgba(255,255,255,0.05)';
-  const tc = 'rgba(255,255,255,0.35)';
+  const mTot = model.length ? (model[model.length-1] - 100).toFixed(0) : 0;
+  const bTot = bData.length ? (bData[bData.length-1] - 100).toFixed(0) : 0;
+  set('lgModel', `Model +${mTot}%`);
+  set('lgBench', `${bnd?.name||'Benchmark'} +${bTot}%`);
 
-  // Update legend text
-  const mTotal = model.length ? model[model.length-1] - 100 : 0;
-  const bTotal = bData.length ? bData[bData.length-1] - 100 : 0;
-  document.getElementById('legendModel').textContent =
-    'Model +' + Math.round(mTotal) + '%';
-  document.getElementById('legendBench').textContent =
-    (bnd?.name ?? 'Benchmark') + ' +' + Math.round(bTotal) + '%';
-
-  // Update chart subtitle
   if (dates.length) {
-    const start = dates[0].replace('-', '/');
-    const end   = dates[dates.length-1].replace('-', '/');
-    document.getElementById('chartSub').textContent =
-      start + ' – ' + end + '  ·  Total return indexed to 100';
+    set('chartSub',
+      dates[0].replace('-','/') + ' – ' + dates[dates.length-1].replace('-','/') +
+      '  ·  $100 indexed at start');
   }
 
-  const datasets = [
-    {
-      label: 'Model',
-      data: model,
-      borderColor: '#3fb950',
-      backgroundColor: 'rgba(63,185,80,0.07)',
-      borderWidth: 1.8,
-      fill: true,
-      tension: 0.2,
-      pointRadius: 0,
-      pointHoverRadius: 4,
-    },
-    {
-      label: bnd?.name ?? 'Benchmark',
-      data: bData,
-      borderColor: '#58a6ff',
-      backgroundColor: 'transparent',
-      borderWidth: 1.5,
-      borderDash: [5, 3],
-      fill: false,
-      tension: 0.2,
-      pointRadius: 0,
-      pointHoverRadius: 4,
-    },
-  ];
+  const gc = 'rgba(255,255,255,0.04)';
+  const tc = 'rgba(255,255,255,0.3)';
 
   if (_chart) {
     _chart.data.labels = labels;
     _chart.data.datasets[0].data = model;
     _chart.data.datasets[1].data = bData;
-    _chart.data.datasets[1].label = bnd?.name ?? 'Benchmark';
+    _chart.data.datasets[1].label = bnd?.name || 'Benchmark';
     _chart.update('none');
     return;
   }
 
   _chart = new Chart(document.getElementById('perfChart'), {
     type: 'line',
-    data: { labels, datasets },
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Model',
+          data: model,
+          borderColor: '#3fb950',
+          backgroundColor: 'rgba(63,185,80,0.06)',
+          borderWidth: 1.8,
+          fill: true,
+          tension: 0.2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+        {
+          label: bnd?.name || 'Benchmark',
+          data: bData,
+          borderColor: '#58a6ff',
+          backgroundColor: 'transparent',
+          borderWidth: 1.4,
+          borderDash: [5, 3],
+          fill: false,
+          tension: 0.2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+      ],
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -553,7 +595,8 @@ function buildChart(btData, benchKey) {
           titleColor: '#e6edf3',
           bodyColor: '#8b949e',
           callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`,
+            title: items => items[0].label || dates[items[0].dataIndex],
+            label: ctx  => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`,
           },
         },
       },
@@ -569,30 +612,60 @@ function buildChart(btData, benchKey) {
         y: {
           min: 0,
           grid: { color: gc },
-          ticks: { color: tc, font: { size: 10 } },
+          ticks: { color: tc, font: { size: 10 },
+            callback: v => v === 0 ? '' : v
+          },
         },
       },
     },
   });
 }
 
+// ── Stats cards ───────────────────────────────────────────────────────────────
+function renderStats(benchKey) {
+  if (!_btData) return;
+  const ms  = _btData.model_stats;
+  const bnd = _btData.benchmarks?.[benchKey];
+  if (!ms) return;
+
+  set('sCagr',   pct(ms.cagr));
+  set('sSharpe', ms.sharpe?.toFixed(2) ?? '—');
+  set('sMdd',    pct(ms.max_dd));
+  set('sTotal',  pct(ms.total_return, 0));
+  set('sPeriods', (_btData.dates?.length || '—') + ' months');
+
+  if (bnd?.stats) {
+    const bs = bnd.stats;
+    set('sCagrB',   'vs ' + pct(bs.cagr)              + ' ' + bnd.name);
+    set('sSharpeB', 'vs ' + bs.sharpe?.toFixed(2)      + ' ' + bnd.name);
+    set('sMddB',    'vs ' + pct(bs.max_dd)             + ' ' + bnd.name);
+    set('sTotalB',  'vs ' + pct(bs.total_return, 0)    + ' ' + bnd.name);
+    set('sBenchName', bnd.name);
+    set('sBenchDesc', bnd.description || '');
+    const ddAdv = (ms.max_dd ?? 0) - (bs.max_dd ?? 0);
+    set('sDdAdv', pct(ddAdv));
+  }
+}
+
 // ── Benchmark switch ──────────────────────────────────────────────────────────
-function switchBenchmark(key) {
+function switchBench(key, btn) {
   _activeBench = key;
   document.querySelectorAll('.bench-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  btn.classList.add('active');
   buildChart(_btData, key);
-  renderBacktestStats(key);
+  renderStats(key);
+  renderAnnualReturns(_btData, key);
 }
 
-// ── Above-cash indicator ──────────────────────────────────────────────────────
+// ── Above cash ────────────────────────────────────────────────────────────────
 function renderAboveCash(data) {
-  const el = document.getElementById('aboveCashVal');
-  el.textContent = data.funds_above_cash + ' / ' + data.rankings.length;
-  el.className = 'stat-value ' + (data.funds_above_cash >= 2 ? 'pos' : 'neg');
+  const el  = document.getElementById('sAboveCash');
+  const tot = data.rankings?.length || 11;
+  el.textContent = `${data.funds_above_cash} / ${tot}`;
+  el.className   = 'stat-value ' + (data.funds_above_cash >= 2 ? 'pos' : 'neg');
 }
 
-// ── Load data ─────────────────────────────────────────────────────────────────
+// ── Load ──────────────────────────────────────────────────────────────────────
 async function loadData() {
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
@@ -600,35 +673,141 @@ async function loadData() {
   setStatus('Fetching latest picks…', '', true);
 
   try {
-    const res = await fetch('./data.json?t=' + Date.now());
+    const res  = await fetch('./data.json?t=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
     renderPicks(data);
-    renderRankings(data.rankings);
+    renderRankings(data.rankings || []);
     renderAboveCash(data);
 
-    document.getElementById('lastUpdated').textContent = 'Data: ' + data.updated_display;
+    set('lastUpdated', 'Updated: ' + data.updated_display);
 
-    // Backtest chart — real data
     if (data.backtest) {
       _btData = data.backtest;
       buildChart(_btData, _activeBench);
-      renderBacktestStats(_activeBench);
+      renderStats(_activeBench);
+      renderAnnualReturns(_btData, _activeBench);
+      renderHeatmap(_btData);
     }
 
-    const errNote = data.errors?.length ? ` (${data.errors.join(', ')} unavailable)` : '';
-    setStatus('Rankings current as of ' + data.updated_display + errNote, 'success', false);
+    const note = data.errors?.length ? ` · Skipped: ${data.errors.join(', ')}` : '';
+    setStatus('Rankings current as of ' + data.updated_display + note, 'ok', false);
 
   } catch (e) {
-    setStatus('Could not load data.json — ' + e.message, 'error', false);
+    setStatus('Failed to load data.json — ' + e.message + ' · Try refreshing or check back later.', 'error', false);
   }
 
   btn.disabled = false;
   btn.textContent = '↺ Refresh';
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+// ── Annual returns ────────────────────────────────────────────────────────────
+function renderAnnualReturns(btData, benchKey) {
+  if (!btData?.dates?.length) return;
+  const dates = btData.dates;
+  const model = btData.model;
+  const bnd   = btData.benchmarks?.[benchKey];
+  const bData = bnd?.data || [];
+
+  function yearMap(arr, startVal) {
+    const map = {};
+    const years = [...new Set(dates.map(d => d.slice(0,4)))].sort();
+    for (const yr of years) {
+      const idxs = dates.reduce((a, d, i) => { if (d.startsWith(yr)) a.push(i); return a; }, []);
+      if (!idxs.length) continue;
+      const first = idxs[0];
+      const last  = idxs[idxs.length - 1];
+      map[yr] = {
+        start:   first === 0 ? startVal : arr[first - 1],
+        end:     arr[last],
+        partial: idxs.length < 12,
+      };
+    }
+    return map;
+  }
+
+  const mMap = yearMap(model, 100);
+  const bMap = bData.length ? yearMap(bData, 100) : {};
+  const years = Object.keys(mMap).sort();
+  const maxAbs = Math.max(...years.map(yr => {
+    const m = mMap[yr]; return Math.abs((m.end - m.start) / m.start);
+  }), 0.01);
+
+  set('annBenchHead', bnd?.name || 'Benchmark');
+
+  document.getElementById('annBody').innerHTML = years.map(yr => {
+    const m  = mMap[yr];
+    const b  = bMap[yr];
+    const mR = (m.end - m.start) / m.start;
+    const bR = b ? (b.end - b.start) / b.start : null;
+    const vs = bR != null ? mR - bR : null;
+    const barW = (Math.abs(mR) / maxAbs * 60).toFixed(0);
+    const mClr = mR >= 0 ? 'var(--green)' : 'var(--red)';
+    const bClr = bR == null ? 'var(--dim)' : bR >= 0 ? 'var(--green)' : 'var(--red)';
+    const vClr = vs == null ? 'var(--dim)' : vs >= 0 ? 'var(--green)' : 'var(--red)';
+    const ytd  = m.partial ? '<span style="font-size:9px;color:var(--dim)"> YTD</span>' : '';
+    return `<tr>
+      <td class="ann-yr">${yr}${ytd}</td>
+      <td><div class="ann-bar-wrap">
+        <div class="ann-bar-bg"><div class="ann-bar-fg" style="width:${barW}px;background:${mClr}"></div></div>
+        <span style="color:${mClr};font-weight:600">${pct(mR)}</span>
+      </div></td>
+      <td style="color:${bClr}">${bR != null ? pct(bR) : '—'}</td>
+      <td style="color:${vClr};font-weight:600">${vs != null ? (vs >= 0 ? '+' : '') + (vs * 100).toFixed(1) + ' pp' : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Monthly heatmap ───────────────────────────────────────────────────────────
+function heatColor(r) {
+  if (r == null) return 'var(--surface2)';
+  const alpha = (Math.min(Math.abs(r) / 0.07, 1) * 0.75 + 0.12).toFixed(2);
+  return r >= 0 ? `rgba(63,185,80,${alpha})` : `rgba(248,81,73,${alpha})`;
+}
+
+function renderHeatmap(btData) {
+  if (!btData?.dates?.length) return;
+  const dates = btData.dates;
+  const model = btData.model;
+
+  const mretMap = {};
+  for (let i = 0; i < dates.length; i++) {
+    const prev = i === 0 ? 100 : model[i - 1];
+    mretMap[dates[i]] = (model[i] - prev) / prev;
+  }
+
+  const years = [...new Set(dates.map(d => d.slice(0,4)))].sort();
+
+  document.getElementById('heatmapBody').innerHTML = years.map(yr => {
+    const cells = Array.from({length:12}, (_,mi) => {
+      const key = `${yr}-${String(mi+1).padStart(2,'0')}`;
+      const r   = mretMap[key] ?? null;
+      const txt = r != null ? (r >= 0 ? '+' : '') + (r*100).toFixed(1) + '%' : '';
+      const clr = r != null ? (Math.abs(r) > 0.045 ? '#fff' : r >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--dim)';
+      return `<td style="background:${heatColor(r)};color:${clr}">${txt}</td>`;
+    }).join('');
+
+    const yrIdxs = dates.reduce((a,d,i) => { if(d.startsWith(yr)) a.push(i); return a; },[]);
+    let annR = null, partial = false;
+    if (yrIdxs.length) {
+      const fi = yrIdxs[0], li = yrIdxs[yrIdxs.length-1];
+      const sv = fi === 0 ? 100 : model[fi-1];
+      annR = (model[li] - sv) / sv;
+      partial = yrIdxs.length < 12;
+    }
+    const aClr = annR == null ? 'var(--dim)' : annR >= 0 ? 'var(--green)' : 'var(--red)';
+    const aTxt = annR != null ? (annR >= 0 ? '+' : '') + (annR*100).toFixed(1) + '%' : '';
+    const ytd  = partial ? '<br><span style="font-size:8px;color:var(--dim)">YTD</span>' : '';
+
+    return `<tr>
+      <td class="hm-yr">${yr}</td>
+      ${cells}
+      <td class="hm-annual" style="color:${aClr}">${aTxt}${ytd}</td>
+    </tr>`;
+  }).join('');
+}
+
 loadData();
 </script>
 </body>
