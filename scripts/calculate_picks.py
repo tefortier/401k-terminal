@@ -239,6 +239,7 @@ def current_picks(monthly):
                 "vol_3m":        round(vol, 6),
                 "weighted_rank": round(wr[tk], 4),
                 "latest_price":  round(p0,  4),
+                "score":         round(r6,  6),
             })
         except Exception:
             continue
