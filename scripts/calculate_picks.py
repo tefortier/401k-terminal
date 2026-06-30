@@ -239,10 +239,7 @@ def current_picks(monthly):
                 "vol_3m":        round(vol, 6),
                 "weighted_rank": round(wr[tk], 4),
                 "latest_price":  round(p0,  4),
-<<<<<<< Updated upstream
-=======
                 "score":         round(r6 * W_6M + r3 * W_3M, 6),
->>>>>>> Stashed changes
             })
         except Exception:
             continue
